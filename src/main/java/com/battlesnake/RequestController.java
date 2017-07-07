@@ -42,16 +42,19 @@ public class RequestController {
 
     @RequestMapping(value = "/move", method = RequestMethod.POST, produces = "application/json")
     public MoveResponse move(@RequestBody MoveRequest request) {
-        Snake me = findOurSnake(request);
+        Snake mySnake = findOurSnake(request);
 
-        List<Move> possibleMoves = findValidMoves(request, me.getCoords()[0], me.getCoords()[1]);
+        List<Move> possibleMoves = findValidMoves(request, mySnake.getCoords()[0], mySnake.getCoords()[1]);
 
         System.out.println("I have " + possibleMoves.size() + " valid moves");
 
         if (!possibleMoves.isEmpty()) {
-            Move myMove = possibleMoves.get(0); // determineMove(me.getCoords()[0], possibleMoves.get(0));
-            System.out.println("choosing: " + myMove.getName());
-            return new MoveResponse().setMove(myMove).setTaunt("moving " + myMove.getName());
+            // just forage for now
+            List<Move> foodMoves = movesTowardsFood(request, possibleMoves, mySnake);
+
+            Move myMove = foodMoves.stream().filter(thisFoodMove -> possibleMoves.contains(thisFoodMove)).findFirst().orElse(possibleMoves.get(0));
+            
+            return new MoveResponse().setMove(myMove).setTaunt("foraging " + myMove.getName());
         } else {
             return new MoveResponse()
                     .setMove(Move.DOWN)
@@ -65,6 +68,34 @@ public class RequestController {
         List<Snake> snakes = request.getSnakes();
 
         return snakes.stream().filter(thisSnake -> thisSnake.getId().equals(myUuid)).findFirst().orElse(null);
+    }
+
+    private List<Move> movesTowardsFood(MoveRequest request, List<Move> possibleMoves, Snake mySnake) {
+        ArrayList<Move> returnMe = new ArrayList<>();
+
+        int[] head = mySnake.getCoords()[0];
+
+        // faked for just 1 food pellet for now
+        int closestFood = 0;
+
+        int[] closestFoodLocation = request.getFood()[closestFood];
+
+        if (closestFoodLocation[0] < head[0]) {
+            returnMe.add(Move.LEFT);
+        }
+
+        if (closestFoodLocation[0] > head[0]) {
+            returnMe.add(Move.RIGHT);
+        }
+
+        if (closestFoodLocation[1] < head[1]) {
+            returnMe.add(Move.UP);
+        }
+
+        if (closestFoodLocation[1] > head[1]) {
+            returnMe.add(Move.DOWN);
+        }
+        return returnMe;
     }
 
     /*
