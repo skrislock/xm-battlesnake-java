@@ -29,34 +29,66 @@ import java.util.*;
 @RestController
 public class RequestController {
 
-  @RequestMapping(value="/start", method=RequestMethod.POST, produces="application/json")
-  public StartResponse start(@RequestBody StartRequest request) {
-    return new StartResponse()
-      .setName("Bowser Snake")
-      .setColor("#FF0000")
-      .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
-      .setHeadType(HeadType.DEAD)
-      .setTailType(TailType.PIXEL)
-      .setTaunt("Roarrrrrrrrr!");
-  }
+    @RequestMapping(value = "/start", method = RequestMethod.POST, produces = "application/json")
+    public StartResponse start(@RequestBody StartRequest request) {
+        return new StartResponse()
+                .setName("Bowser Snake")
+                .setColor("#FF0000")
+                .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
+                .setHeadType(HeadType.DEAD)
+                .setTailType(TailType.PIXEL)
+                .setTaunt("Roarrrrrrrrr!");
+    }
 
-  @RequestMapping(value="/move", method=RequestMethod.POST, produces = "application/json")
-  public MoveResponse move(@RequestBody MoveRequest request) {
-    return new MoveResponse()
-      .setMove(Move.DOWN)
-      .setTaunt("Going Down!");
-  }
-    
-  @RequestMapping(value="/end", method=RequestMethod.POST)
-  public Object end() {
-      // No response required
-      Map<String, Object> responseObject = new HashMap<String, Object>();
-      return responseObject;
-  }
+    @RequestMapping(value = "/move", method = RequestMethod.POST, produces = "application/json")
+    public MoveResponse move(@RequestBody MoveRequest request) {
+        Snake me = findOurSnake(request);
+
+        List<int[]> possibleMoves = findValidMoves(request, me.getCoords()[0], me.getCoords()[1]);
+
+        System.out.println("I have " + possibleMoves.size() + " valid moves");
+
+        if (!possibleMoves.isEmpty()) {
+            return new MoveResponse().setMove(determineMove(me.getCoords()[0], possibleMoves.get(0))).setTaunt("moving");
+        } else {
+            return new MoveResponse()
+                    .setMove(Move.DOWN)
+                    .setTaunt("Going Down!");
+        }
+    }
+
+    private Snake findOurSnake(MoveRequest request) {
+        String myUuid = request.getYou();
+
+        List<Snake> snakes = request.getSnakes();
+
+        return snakes.stream().filter(thisSnake -> thisSnake.getId().equals(myUuid)).findFirst().orElse(null);
+    }
+
+    private Move determineMove(int[] head, int[] move) {
+        if (head[0] == move[0] + 1 && head[1] == move[1]) {
+            return Move.RIGHT;
+        } else if (head[0] == move[0] && head[1] + 1 == move[1]) {
+            return Move.UP;
+        } else if (head[0] - 1 == move[0] && head[1] == move[1]) {
+            return Move.LEFT;
+        } else if (head[0] == move[0] && head[1] == move[1] - 1) {
+            return Move.DOWN;
+        } else {
+            return null;
+        }
+    }
+
+    @RequestMapping(value = "/end", method = RequestMethod.POST)
+    public Object end() {
+        // No response required
+        Map<String, Object> responseObject = new HashMap<String, Object>();
+        return responseObject;
+    }
 
     public ArrayList<int[]> findValidMoves(MoveRequest request, int[] head, int[] previous) {
 
-        ArrayList<int[]> returnMe = new ArrayList();
+        ArrayList<int[]> returnMe = new ArrayList<>();
 
         // analyze right
         int[] right = new int[] {head[0] + 1, head[1]};
