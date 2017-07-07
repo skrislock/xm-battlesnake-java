@@ -54,4 +54,100 @@ public class RequestController {
       return responseObject;
   }
 
+    public ArrayList<int[]> findValidMoves(MoveRequest request, int[] head, int[] previous) {
+
+        ArrayList<int[]> returnMe = new ArrayList();
+
+        // analyze right
+        int[] right = new int[] {head[0] + 1, head[1]};
+        boolean keepRight = analyze(request, head, previous, right);
+        if (keepRight) {
+            System.out.println("right is OK");
+            returnMe.add(right);
+        }
+
+        // analyze top
+        int[] top = new int[] { head[0], head[1] - 1 };
+        boolean keepTop = analyze(request, head, previous, top);
+        if (keepTop) {
+            System.out.println("top is OK");
+            returnMe.add(top);
+        }
+
+        // analyze left
+        int[] left = new int[] { head[0] - 1, head[1] };
+        boolean keepLeft = analyze(request, head, previous, left);
+        if (keepLeft) {
+            System.out.println("left is OK");
+            returnMe.add(left);
+        }
+
+        // analyze down
+        int[] bottom = new int[] { head[0], head[1] + 1 };
+        boolean keepBottom = analyze(request, head, previous, bottom);
+        if (keepBottom) {
+            System.out.println("bottom is OK");
+            returnMe.add(bottom);
+        }
+
+        return returnMe;
+    }
+
+    public boolean analyze(MoveRequest request, int[] head, int[] previous, int[] analyzeMe) {
+        if (coordinatesEquals(previous, analyzeMe)) {
+            System.out.println("don't go backwards");
+            return false;
+        }
+
+        // don't hit the walls
+        if (analyzeMe[0] < 0 || analyzeMe[0] >= request.getWidth()) { // off by one?
+            System.out.println("don't hit the wall");
+            return false;
+        }
+
+        if (analyzeMe[1] < 0 || analyzeMe[1] >= request.getHeight()) { // off by one?
+            System.out.println("don't hit the wall");
+            return false;
+        }
+
+        // don't hit another snake
+        List<Snake> snakes = request.getSnakes();
+        System.out.println("there are : " + snakes.size() + "snakes");
+
+        Iterator<Snake> it = snakes.iterator();
+        while (it.hasNext()) {
+            Snake thisSnake = it.next();
+            System.out.println("analyzing snake : " + thisSnake.getName());
+            System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]);
+            int[][] thisSnakeCoords = thisSnake.getCoords();
+
+            System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
+
+            for (int i = 0; i < thisSnakeCoords.length; i++) {
+                int[] thisCoord = thisSnakeCoords[i];
+                System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
+                if (coordinatesEquals(thisCoord, analyzeMe)) {
+                    System.out.println("don't hit another snake");
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public boolean coordinatesEquals(int[] oneArray, int[] secondArray) {
+        if (oneArray.length != secondArray.length) {
+            return false;
+        }
+
+        for (int x = 0; x < oneArray.length; x++) {
+            if (oneArray[x] != secondArray[x]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 }
