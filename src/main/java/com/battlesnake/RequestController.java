@@ -55,7 +55,7 @@ public class RequestController {
             outputMoveList(foodMoves, "foodMoves");
 
             Move myMove = foodMoves.stream().filter(thisFoodMove -> possibleMoves.contains(thisFoodMove)).findFirst().orElse(possibleMoves.get(0));
-            
+            System.out.println("picking " + myMove.getName());
             return new MoveResponse().setMove(myMove).setTaunt("foraging " + myMove.getName());
         } else {
             return new MoveResponse()
@@ -130,7 +130,7 @@ public class RequestController {
         int[] right = new int[] {head[0] + 1, head[1]};
         boolean keepRight = analyze(request, head, previous, right);
         if (keepRight) {
-            System.out.println("right is OK");
+            // System.out.println("right is OK");
             returnMe.add(Move.RIGHT);
         }
 
@@ -138,7 +138,7 @@ public class RequestController {
         int[] up = new int[] { head[0], head[1] - 1 };
         boolean keepUp = analyze(request, head, previous, up);
         if (keepUp) {
-            System.out.println("top is OK");
+            // System.out.println("top is OK");
             returnMe.add(Move.UP);
         }
 
@@ -146,7 +146,7 @@ public class RequestController {
         int[] left = new int[] { head[0] - 1, head[1] };
         boolean keepLeft = analyze(request, head, previous, left);
         if (keepLeft) {
-            System.out.println("left is OK");
+            // System.out.println("left is OK");
             returnMe.add(Move.LEFT);
         }
 
@@ -154,7 +154,7 @@ public class RequestController {
         int[] down = new int[] { head[0], head[1] + 1 };
         boolean keepDown = analyze(request, head, previous, down);
         if (keepDown) {
-            System.out.println("bottom is OK");
+            // System.out.println("bottom is OK");
             returnMe.add(Move.DOWN);
         }
 
@@ -180,13 +180,13 @@ public class RequestController {
 
         // don't hit another snake
         List<Snake> snakes = request.getSnakes();
-        System.out.println("there are : " + snakes.size() + "snakes");
+        // System.out.println("there are : " + snakes.size() + "snakes");
 
         Iterator<Snake> it = snakes.iterator();
         while (it.hasNext()) {
             Snake thisSnake = it.next();
-            System.out.println("analyzing snake : " + thisSnake.getName());
-            System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]);
+            // System.out.println("analyzing snake : " + thisSnake.getName());
+            // System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]);
             int[][] thisSnakeCoords = thisSnake.getCoords();
 
             // System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
