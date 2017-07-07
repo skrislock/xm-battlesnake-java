@@ -49,11 +49,13 @@ public class RequestController {
         System.out.println("I have " + possibleMoves.size() + " valid moves");
 
         if (!possibleMoves.isEmpty()) {
-            return new MoveResponse().setMove(determineMove(me.getCoords()[0], possibleMoves.get(0))).setTaunt("moving");
+            Move myMove = determineMove(me.getCoords()[0], possibleMoves.get(0));
+            System.out.println("choosing: " + myMove.getName());
+            return new MoveResponse().setMove(myMove).setTaunt("moving " + myMove.getName());
         } else {
             return new MoveResponse()
                     .setMove(Move.DOWN)
-                    .setTaunt("Going Down!");
+                    .setTaunt("Error! Going Down!");
         }
     }
 
@@ -66,7 +68,7 @@ public class RequestController {
     }
 
     private Move determineMove(int[] head, int[] move) {
-        if (head[0] == move[0] + 1 && head[1] == move[1]) {
+        if (head[0] + 1 == move[0] && head[1] == move[1]) {
             return Move.RIGHT;
         } else if (head[0] == move[0] && head[1] + 1 == move[1]) {
             return Move.UP;
@@ -160,6 +162,25 @@ public class RequestController {
                 System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
                 if (coordinatesEquals(thisCoord, analyzeMe)) {
                     System.out.println("don't hit another snake");
+                    return false;
+                }
+            }
+        }
+
+        it = request.getDeadSnakes().iterator();
+        while (it.hasNext()) {
+            Snake thisSnake = it.next();
+            System.out.println("analyzing dead snake : " + thisSnake.getName());
+            System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]);
+            int[][] thisSnakeCoords = thisSnake.getCoords();
+
+            System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
+
+            for (int i = 0; i < thisSnakeCoords.length; i++) {
+                int[] thisCoord = thisSnakeCoords[i];
+                System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
+                if (coordinatesEquals(thisCoord, analyzeMe)) {
+                    System.out.println("don't hit a dead snake");
                     return false;
                 }
             }
