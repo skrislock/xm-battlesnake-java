@@ -71,11 +71,11 @@ public class RequestController {
         System.out.println("Determining move for: head [" + head[0] + "," + head[1] + "], move[" + move[0] + "," + move[1] + "]");
         if (head[0] + 1 == move[0] && head[1] == move[1]) {
             return Move.RIGHT;
-        } else if (head[0] == move[0] && head[1] + 1 == move[1]) {
+        } else if (head[0] == move[0] && head[1] - 1 == move[1]) {
             return Move.UP;
         } else if (head[0] - 1 == move[0] && head[1] == move[1]) {
             return Move.LEFT;
-        } else if (head[0] == move[0] && head[1] - 1 == move[1]) {
+        } else if (head[0] == move[0] && head[1] + 1 == move[1]) {
             return Move.DOWN;
         } else {
             return null;
