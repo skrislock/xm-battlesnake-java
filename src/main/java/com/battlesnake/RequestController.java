@@ -45,12 +45,14 @@ public class RequestController {
         Snake mySnake = findOurSnake(request);
 
         List<Move> possibleMoves = findValidMoves(request, mySnake.getCoords()[0], mySnake.getCoords()[1]);
+        outputMoveList(possibleMoves, "possibleMoves");
 
         System.out.println("I have " + possibleMoves.size() + " valid moves");
 
         if (!possibleMoves.isEmpty()) {
             // just forage for now
             List<Move> foodMoves = movesTowardsFood(request, possibleMoves, mySnake);
+            outputMoveList(foodMoves, "foodMoves");
 
             Move myMove = foodMoves.stream().filter(thisFoodMove -> possibleMoves.contains(thisFoodMove)).findFirst().orElse(possibleMoves.get(0));
             
@@ -60,6 +62,17 @@ public class RequestController {
                     .setMove(Move.DOWN)
                     .setTaunt("Oh Drat!");
         }
+    }
+
+    private void outputMoveList(List<Move> moveList, String name) {
+        String message = "Here are the moves for " + name;
+
+        for (Move move : moveList) {
+            message += " " + move.getName();
+        }
+
+        System.out.println(message);
+
     }
 
     private Snake findOurSnake(MoveRequest request) {
@@ -176,11 +189,11 @@ public class RequestController {
             System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]);
             int[][] thisSnakeCoords = thisSnake.getCoords();
 
-            System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
+            // System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
 
             for (int i = 0; i < thisSnakeCoords.length; i++) {
                 int[] thisCoord = thisSnakeCoords[i];
-                System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
+                // System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
                 if (coordinatesEquals(thisCoord, analyzeMe)) {
                     System.out.println("don't hit another snake");
                     return false;
@@ -195,11 +208,11 @@ public class RequestController {
             System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]);
             int[][] thisSnakeCoords = thisSnake.getCoords();
 
-            System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
+            // System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
 
             for (int i = 0; i < thisSnakeCoords.length; i++) {
                 int[] thisCoord = thisSnakeCoords[i];
-                System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
+                // System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
                 if (coordinatesEquals(thisCoord, analyzeMe)) {
                     System.out.println("don't hit a dead snake");
                     return false;
