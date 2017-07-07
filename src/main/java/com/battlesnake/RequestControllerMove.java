@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.util.*;
 
 @RestController
-public class RequestController {
+public class RequestControllerMove {
 
     @RequestMapping(value = "/start", method = RequestMethod.POST, produces = "application/json")
     public StartResponse start(@RequestBody StartRequest request) {
@@ -44,18 +44,18 @@ public class RequestController {
     public MoveResponse move(@RequestBody MoveRequest request) {
         Snake me = findOurSnake(request);
 
-        List<Move> possibleMoves = findValidMoves(request, me.getCoords()[0], me.getCoords()[1]);
+        List<int[]> possibleMoves = findValidMoves(request, me.getCoords()[0], me.getCoords()[1]);
 
         System.out.println("I have " + possibleMoves.size() + " valid moves");
 
         if (!possibleMoves.isEmpty()) {
-            Move myMove = possibleMoves.get(0); // determineMove(me.getCoords()[0], possibleMoves.get(0));
+            Move myMove = determineMove(me.getCoords()[0], possibleMoves.get(0));
             System.out.println("choosing: " + myMove.getName());
             return new MoveResponse().setMove(myMove).setTaunt("moving " + myMove.getName());
         } else {
             return new MoveResponse()
                     .setMove(Move.DOWN)
-                    .setTaunt("Oh Drat!");
+                    .setTaunt("Error! Going Down!");
         }
     }
 
@@ -67,9 +67,20 @@ public class RequestController {
         return snakes.stream().filter(thisSnake -> thisSnake.getId().equals(myUuid)).findFirst().orElse(null);
     }
 
-    /*
-     * private Move determineMove(int[] head, int[] move) { System.out.println("Determining move for: head [" + head[0] + "," + head[1] + "], move[" + move[0] + "," + move[1] + "]"); if (head[0] + 1 == move[0] && head[1] == move[1]) { return Move.RIGHT; } else if (head[0] == move[0] && head[1] - 1 == move[1]) { return Move.UP; } else if (head[0] - 1 == move[0] && head[1] == move[1]) { return Move.LEFT; } else if (head[0] == move[0] && head[1] + 1 == move[1]) { return Move.DOWN; } else { return null; } }
-     */
+    private Move determineMove(int[] head, int[] move) {
+        System.out.println("Determining move for: head [" + head[0] + "," + head[1] + "], move[" + move[0] + "," + move[1] + "]");
+        if (head[0] + 1 == move[0] && head[1] == move[1]) {
+            return Move.RIGHT;
+        } else if (head[0] == move[0] && head[1] - 1 == move[1]) {
+            return Move.UP;
+        } else if (head[0] - 1 == move[0] && head[1] == move[1]) {
+            return Move.LEFT;
+        } else if (head[0] == move[0] && head[1] + 1 == move[1]) {
+            return Move.DOWN;
+        } else {
+            return null;
+        }
+    }
 
     @RequestMapping(value = "/end", method = RequestMethod.POST)
     public Object end() {
@@ -78,24 +89,24 @@ public class RequestController {
         return responseObject;
     }
 
-    public ArrayList<Move> findValidMoves(MoveRequest request, int[] head, int[] previous) {
+    public ArrayList<int[]> findValidMoves(MoveRequest request, int[] head, int[] previous) {
 
-        ArrayList<Move> returnMe = new ArrayList<>();
+        ArrayList<int[]> returnMe = new ArrayList<>();
 
         // analyze right
         int[] right = new int[] {head[0] + 1, head[1]};
         boolean keepRight = analyze(request, head, previous, right);
         if (keepRight) {
             System.out.println("right is OK");
-            returnMe.add(Move.RIGHT);
+            returnMe.add(right);
         }
 
         // analyze top
-        int[] up = new int[] { head[0], head[1] - 1 };
-        boolean keepUp = analyze(request, head, previous, up);
-        if (keepUp) {
+        int[] top = new int[] { head[0], head[1] - 1 };
+        boolean keepTop = analyze(request, head, previous, top);
+        if (keepTop) {
             System.out.println("top is OK");
-            returnMe.add(Move.UP);
+            returnMe.add(top);
         }
 
         // analyze left
@@ -103,15 +114,15 @@ public class RequestController {
         boolean keepLeft = analyze(request, head, previous, left);
         if (keepLeft) {
             System.out.println("left is OK");
-            returnMe.add(Move.LEFT);
+            returnMe.add(left);
         }
 
         // analyze down
-        int[] down = new int[] { head[0], head[1] + 1 };
-        boolean keepDown = analyze(request, head, previous, down);
-        if (keepDown) {
+        int[] bottom = new int[] { head[0], head[1] + 1 };
+        boolean keepBottom = analyze(request, head, previous, bottom);
+        if (keepBottom) {
             System.out.println("bottom is OK");
-            returnMe.add(Move.DOWN);
+            returnMe.add(bottom);
         }
 
         return returnMe;
@@ -124,12 +135,12 @@ public class RequestController {
         }
 
         // don't hit the walls
-        if (analyzeMe[0] < 0 || analyzeMe[0] >= request.getWidth()) {
+        if (analyzeMe[0] < 0 || analyzeMe[0] >= request.getWidth()) { // off by one?
             System.out.println("don't hit the wall");
             return false;
         }
 
-        if (analyzeMe[1] < 0 || analyzeMe[1] >= request.getHeight()) {
+        if (analyzeMe[1] < 0 || analyzeMe[1] >= request.getHeight()) { // off by one?
             System.out.println("don't hit the wall");
             return false;
         }
