@@ -47,10 +47,21 @@ public class RequestController {
         List<Move> possibleMoves = findValidMoves(request, mySnake.getCoords()[0], mySnake.getCoords()[1]);
         outputMoveList(possibleMoves, "possibleMoves");
 
-        System.out.println("I have " + possibleMoves.size() + " valid moves");
+        // remove dangerous moves
+        List<Move> dangerousMoves = findDangerousMoves(request, mySnake, possibleMoves);
+        outputMoveList(dangerousMoves, "dangerousMoves");
+
+        List<Move> originalPossibleMoves = possibleMoves;
+        possibleMoves.removeAll(dangerousMoves);
+
+        if (possibleMoves.isEmpty()) { // last resort
+            possibleMoves.addAll(originalPossibleMoves);
+        }
 
         if (!possibleMoves.isEmpty()) {
             // just forage for now
+            // maybe hunting here
+            // maybe setting traps here
             List<Move> foodMoves = movesTowardsFood(request, possibleMoves, mySnake);
             outputMoveList(foodMoves, "foodMoves");
 
@@ -63,6 +74,94 @@ public class RequestController {
                     .setTaunt("Oh Drat!");
         }
     }
+
+    private List<Move> findDangerousMoves(MoveRequest request, Snake mySnake, List<Move> possibleMoves) {
+        List<Move> dangerousMoves = new ArrayList<>();
+
+        for (Move possibleMove : possibleMoves) {
+            if (itsATrap(request, mySnake.getCoords()[0], possibleMove)) {
+                dangerousMoves.add(possibleMove);
+            }
+
+            // if (badCollisionPossible(request, possibleMove))
+        }
+
+        return dangerousMoves;
+    }
+
+    private boolean itsATrap(MoveRequest request, int[] head, Move possibleMove) {
+        // analyze this move to see if we get ourselves into a space with less than 10 moves
+        System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "] for move: " + possibleMove.getName());
+
+        int trapValue = 10;
+
+        // maybe run this on every valid move? one less step?
+        int [][] initialCoveredPoints = new int [][]{};
+        initialCoveredPoints[0] = head;
+        int possiblePathCount = recursePathFindTraps(request, findProposedPoint(head, possibleMove), head, initialCoveredPoints, trapValue, 0);
+        System.out.println("Counted: " + possiblePathCount);
+        if (possiblePathCount < trapValue) {
+            System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "], found trap : " + possibleMove.getName());
+            return true;
+        }
+
+        return false;
+    }
+    
+    // maybe this can be used for more than finding traps
+    private int recursePathFindTraps(MoveRequest request, int[] newHead, int [] newNeck,
+            int[][] coveredPoints, int limit, int counter) {
+        System.out.println("counter is: " + counter);
+
+        // if we are over the limit, return counter without incrementing
+        if (counter >= limit) {
+            return counter;
+        }
+        
+        // if we have already checked this point, return counter without incrementing
+        for(int i = 0 ; i < coveredPoints.length ; i++) {
+            if (coordinatesEquals(newHead, coveredPoints[i])) {
+                return counter;
+            }
+        }
+        
+        ArrayList<Move> validMoves = findValidMoves(request, newHead, newNeck);
+        
+        if(validMoves.isEmpty()) { // no valid moves here
+            return counter;
+        }
+
+        for(Move validMove : validMoves) {
+            int[] proposedHead = findProposedPoint(newHead, validMove);
+            
+            recursePathFindTraps(request, proposedHead, newHead, coveredPoints, limit, counter++);
+            
+            coveredPoints[coveredPoints.length] = proposedHead;
+        }
+        
+        return counter;
+    }
+
+    private int[] findProposedPoint(int[] point, Move move) {
+        int[] proposedPoint = point;
+        if (move.equals(Move.RIGHT)) {
+            proposedPoint[1]++;
+        } else if (move.equals(Move.UP)) {
+            proposedPoint[0]--;
+        } else if (move.equals(Move.LEFT)) {
+            proposedPoint[1]--;
+        } else if (move.equals(Move.DOWN)) {
+            proposedPoint[0]++;
+        }
+        return proposedPoint;
+    }
+
+    /*
+    private boolean badCollisionPossible(MoveRequest request, Move possibleMove) {
+        
+        return false;
+    }
+    */
 
     private void outputMoveList(List<Move> moveList, String name) {
         String message = "Here are the moves for " + name;
@@ -201,25 +300,14 @@ public class RequestController {
             }
         }
 
-        it = request.getDeadSnakes().iterator();
-        while (it.hasNext()) {
-            Snake thisSnake = it.next();
-            System.out.println("analyzing dead snake : " + thisSnake.getName());
-            System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]);
-            int[][] thisSnakeCoords = thisSnake.getCoords();
-
-            // System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
-
-            for (int i = 0; i < thisSnakeCoords.length; i++) {
-                int[] thisCoord = thisSnakeCoords[i];
-                // System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
-                if (coordinatesEquals(thisCoord, analyzeMe)) {
-                    System.out.println("don't hit a dead snake");
-                    return false;
-                }
-            }
-        }
-
+        // I guess you dont' die if you hit a dead snake
+        /*
+         * it = request.getDeadSnakes().iterator(); while (it.hasNext()) { Snake thisSnake = it.next(); System.out.println("analyzing dead snake : " + thisSnake.getName()); System.out.println("analyzingMe is : " + analyzeMe[0] + ", " + analyzeMe[1]); int[][] thisSnakeCoords = thisSnake.getCoords();
+         * 
+         * // System.out.println("Fancy output : " + Arrays.deepToString(thisSnakeCoords));
+         * 
+         * for (int i = 0; i < thisSnakeCoords.length; i++) { int[] thisCoord = thisSnakeCoords[i]; // System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]); if (coordinatesEquals(thisCoord, analyzeMe)) { System.out.println("don't hit a dead snake"); return false; } } }
+         */
         return true;
     }
 
