@@ -55,6 +55,7 @@ public class RequestController {
         possibleMoves.removeAll(dangerousMoves);
 
         if (possibleMoves.isEmpty()) { // last resort
+
             possibleMoves.addAll(originalPossibleMoves);
         }
 

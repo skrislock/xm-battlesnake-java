@@ -28,4 +28,8 @@ public enum Move {
   public String getName() {
     return name().toLowerCase();
   }
+
+    public boolean equals(Move move1, Move move2) {
+        return move1.getName().equals(move2.getName());
+    }
 }
