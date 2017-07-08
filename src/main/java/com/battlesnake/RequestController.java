@@ -151,13 +151,13 @@ public class RequestController {
     private int[] findProposedPoint(int[] point, Move move) {
         int[] proposedPoint = point;
         if (move.equals(Move.RIGHT)) {
-            proposedPoint[1]++;
+            proposedPoint[1] = proposedPoint[1] + 1;
         } else if (move.equals(Move.UP)) {
-            proposedPoint[0]--;
+            proposedPoint[0] = proposedPoint[0] - 1;
         } else if (move.equals(Move.LEFT)) {
-            proposedPoint[1]--;
+            proposedPoint[1] = proposedPoint[1] - 1;
         } else if (move.equals(Move.DOWN)) {
-            proposedPoint[0]++;
+            proposedPoint[0] = proposedPoint[0] + 1;
         }
         return proposedPoint;
     }
