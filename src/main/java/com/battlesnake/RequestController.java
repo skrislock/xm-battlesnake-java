@@ -55,7 +55,7 @@ public class RequestController {
         possibleMoves.removeAll(dangerousMoves);
 
         if (possibleMoves.isEmpty()) { // last resort
-
+            System.out.println("Last Resort");
             possibleMoves.addAll(originalPossibleMoves);
         }
 
@@ -149,8 +149,8 @@ public class RequestController {
         return counter;
     }
 
-    private int[] findProposedPoint(int[] point, Move move) {
-        int[] proposedPoint = point;
+    public int[] findProposedPoint(int[] point, Move move) {
+        int[] proposedPoint = point.clone();
         if (move.equals(Move.RIGHT)) {
             proposedPoint[1] = proposedPoint[1] + 1;
         } else if (move.equals(Move.UP)) {
