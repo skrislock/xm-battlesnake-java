@@ -91,14 +91,18 @@ public class RequestController {
 
     private boolean itsATrap(MoveRequest request, int[] head, Move possibleMove) {
         // analyze this move to see if we get ourselves into a space with less than 10 moves
-        System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "] for move: " + possibleMove.getName());
+        int[] proposedPoint = findProposedPoint(head, possibleMove);
+        
+        System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "] for move: " + possibleMove.getName() 
+            + " proposedPoint: [" + proposedPoint[0] + "," + proposedPoint[1] + "]");
 
         int trapValue = 10;
 
         // maybe run this on every valid move? one less step?
         ArrayList<int[]> initialCoveredPoints = new ArrayList<>();
         initialCoveredPoints.add(head);
-        int possiblePathCount = recursePathFindTraps(request, findProposedPoint(head, possibleMove), head, initialCoveredPoints, trapValue, 0);
+        
+        int possiblePathCount = recursePathFindTraps(request, proposedPoint, head, initialCoveredPoints, trapValue, 0);
         System.out.println("Counted: " + possiblePathCount);
         if (possiblePathCount < trapValue) {
             System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "], found trap : " + possibleMove.getName());
@@ -121,6 +125,7 @@ public class RequestController {
         // if we have already checked this point, return counter without incrementing
         for (int[] thisCoveredPoint : coveredPoints) {
             if (coordinatesEquals(newHead, thisCoveredPoint)) {
+                System.out.println("Already checked this point [" + newHead[0] + "," + newHead[1] + "]");
                 return counter;
             }
         }
@@ -128,6 +133,7 @@ public class RequestController {
         ArrayList<Move> validMoves = findValidMoves(request, newHead, newNeck);
         
         if(validMoves.isEmpty()) { // no valid moves here
+            System.out.println("No valid moves");
             return counter;
         }
 
