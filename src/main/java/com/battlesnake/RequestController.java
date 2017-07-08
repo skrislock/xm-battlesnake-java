@@ -96,8 +96,8 @@ public class RequestController {
         int trapValue = 10;
 
         // maybe run this on every valid move? one less step?
-        int [][] initialCoveredPoints = new int [][]{};
-        initialCoveredPoints[0] = head;
+        ArrayList<int[]> initialCoveredPoints = new ArrayList<>();
+        initialCoveredPoints.add(head);
         int possiblePathCount = recursePathFindTraps(request, findProposedPoint(head, possibleMove), head, initialCoveredPoints, trapValue, 0);
         System.out.println("Counted: " + possiblePathCount);
         if (possiblePathCount < trapValue) {
@@ -110,7 +110,7 @@ public class RequestController {
     
     // maybe this can be used for more than finding traps
     private int recursePathFindTraps(MoveRequest request, int[] newHead, int [] newNeck,
-            int[][] coveredPoints, int limit, int counter) {
+            List<int[]> coveredPoints, int limit, int counter) {
         System.out.println("counter is: " + counter);
 
         // if we are over the limit, return counter without incrementing
@@ -119,8 +119,8 @@ public class RequestController {
         }
         
         // if we have already checked this point, return counter without incrementing
-        for(int i = 0 ; i < coveredPoints.length ; i++) {
-            if (coordinatesEquals(newHead, coveredPoints[i])) {
+        for (int[] thisCoveredPoint : coveredPoints) {
+            if (coordinatesEquals(newHead, thisCoveredPoint)) {
                 return counter;
             }
         }
@@ -136,7 +136,7 @@ public class RequestController {
             
             recursePathFindTraps(request, proposedHead, newHead, coveredPoints, limit, counter++);
             
-            coveredPoints[coveredPoints.length] = proposedHead;
+            coveredPoints.add(proposedHead);
         }
         
         return counter;
