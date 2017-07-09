@@ -116,7 +116,7 @@ public class RequestController {
     // maybe this can be used for more than finding traps
     private int recursePathFindTraps(MoveRequest request, int[] newHead, int [] newNeck,
             List<int[]> coveredPoints, int limit, int counter) {
-        System.out.println("counter is: " + counter);
+        System.out.println("counter is: " + counter + ", newHead is [" + newHead[0] + "," + newHead[1] + "]");
 
         // if we are over the limit, return counter without incrementing
         if (counter >= limit) {
@@ -138,12 +138,16 @@ public class RequestController {
             return counter;
         }
 
+        coveredPoints.add(newHead);
+
         for(Move validMove : validMoves) {
             int[] proposedHead = findProposedPoint(newHead, validMove);
+
+            counter = recursePathFindTraps(request, proposedHead, newHead, coveredPoints, limit, counter + 1);
             
-            recursePathFindTraps(request, proposedHead, newHead, coveredPoints, limit, counter++);
-            
-            coveredPoints.add(proposedHead);
+            if (counter >= limit) { // we're already over the limit so stop counting
+                return counter;
+            }
         }
         
         return counter;
@@ -152,13 +156,13 @@ public class RequestController {
     public int[] findProposedPoint(int[] point, Move move) {
         int[] proposedPoint = point.clone();
         if (move.equals(Move.RIGHT)) {
-            proposedPoint[1] = proposedPoint[1] + 1;
-        } else if (move.equals(Move.UP)) {
-            proposedPoint[0] = proposedPoint[0] - 1;
-        } else if (move.equals(Move.LEFT)) {
-            proposedPoint[1] = proposedPoint[1] - 1;
-        } else if (move.equals(Move.DOWN)) {
             proposedPoint[0] = proposedPoint[0] + 1;
+        } else if (move.equals(Move.UP)) {
+            proposedPoint[1] = proposedPoint[1] - 1;
+        } else if (move.equals(Move.LEFT)) {
+            proposedPoint[0] = proposedPoint[0] - 1;
+        } else if (move.equals(Move.DOWN)) {
+            proposedPoint[1] = proposedPoint[1] + 1;
         }
         return proposedPoint;
     }
