@@ -51,7 +51,7 @@ public class RequestController {
         List<Move> dangerousMoves = findDangerousMoves(request, mySnake, possibleMoves);
         outputMoveList(dangerousMoves, "dangerousMoves");
 
-        List<Move> originalPossibleMoves = possibleMoves;
+        List<Move> originalPossibleMoves = new ArrayList<>(possibleMoves);
         possibleMoves.removeAll(dangerousMoves);
 
         if (possibleMoves.isEmpty()) { // last resort
