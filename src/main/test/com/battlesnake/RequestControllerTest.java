@@ -43,7 +43,7 @@ public class RequestControllerTest {
         trapSnake.setHealth(100);
         trapSnake.setName("mySnakeName");
         trapSnake.setTaunt("mySnakeTaunt");
-        trapSnake.setCoords(new int[][] { { 1, 0 }, { 1, 1 }, { 2, 1 }, { 3, 1 }, { 4, 1 }, { 4, 0 } });
+        trapSnake.setCoords(new int[][] { { 1, 0 }, { 1, 1 }, { 1, 2 }, { 2, 2 }, { 3, 2 }, { 4, 2 } });
         return trapSnake;
     }
 
@@ -64,6 +64,7 @@ public class RequestControllerTest {
     public void testItsATrap() {
         setUpTrapSnake();
         MoveResponse moveResponse = rc.move(moveRequest);
+        Assert.assertEquals(Move.LEFT, moveResponse.getMove());
     }
 
 }

@@ -127,7 +127,8 @@ public class RequestController {
         for (int[] thisCoveredPoint : coveredPoints) {
             if (coordinatesEquals(newHead, thisCoveredPoint)) {
                 System.out.println("Already checked this point [" + newHead[0] + "," + newHead[1] + "]");
-                return counter;
+                return counter - 1;
+                // return counter;
             }
         }
         
