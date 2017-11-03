@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseBody;
+// import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.*;
 import static java.util.stream.Collectors.toList;
@@ -51,11 +51,9 @@ public class RequestController {
         List<Snake> otherSnakes = findOtherSnakes(request);
 
         List<Move> possibleMoves = findValidMoves(request, mySnake.getCoords()[0], mySnake.getCoords()[1]);
-        outputMoveList(possibleMoves, "possibleMoves");
 
         // remove dangerous moves
         List<Move> dangerousMoves = findDangerousMoves(request, mySnake, otherSnakes, possibleMoves);
-        outputMoveList(dangerousMoves, "dangerousMoves");
 
         List<Move> originalPossibleMoves = new ArrayList<>(possibleMoves);
         if (!dangerousMoves.isEmpty()) {
