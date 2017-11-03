@@ -25,37 +25,46 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.*;
+import static java.util.stream.Collectors.toList;
 
 @RestController
 public class RequestController {
+    private final String BAD_MOVE_KEY = "bad";
+    private final String GOOD_MOVE_KEY = "good";
 
     @RequestMapping(value = "/start", method = RequestMethod.POST, produces = "application/json")
     public StartResponse start(@RequestBody StartRequest request) {
         return new StartResponse()
-                .setName("Bowser Snake")
-                .setColor("#FF0000")
+                .setName("X Snake")
+                .setColor("#FF00F0")
                 .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
                 .setHeadType(HeadType.DEAD)
                 .setTailType(TailType.PIXEL)
                 .setTaunt("Roarrrrrrrrr!");
     }
-
+  
     @RequestMapping(value = "/move", method = RequestMethod.POST, produces = "application/json")
     public MoveResponse move(@RequestBody MoveRequest request) {
+        MoveResponse moveResponse = new MoveResponse();
+        
         Snake mySnake = findOurSnake(request);
+        List<Snake> otherSnakes = findOtherSnakes(request);
 
         List<Move> possibleMoves = findValidMoves(request, mySnake.getCoords()[0], mySnake.getCoords()[1]);
         outputMoveList(possibleMoves, "possibleMoves");
 
         // remove dangerous moves
-        List<Move> dangerousMoves = findDangerousMoves(request, mySnake, possibleMoves);
+        List<Move> dangerousMoves = findDangerousMoves(request, mySnake, otherSnakes, possibleMoves);
         outputMoveList(dangerousMoves, "dangerousMoves");
 
         List<Move> originalPossibleMoves = new ArrayList<>(possibleMoves);
+        if (!dangerousMoves.isEmpty()) {
+            moveResponse.setTaunt("Avoiding Trap");
+        }
         possibleMoves.removeAll(dangerousMoves);
 
         if (possibleMoves.isEmpty()) { // last resort
-            System.out.println("Last Resort");
+            moveResponse.setTaunt("Last Resort");
             possibleMoves.addAll(originalPossibleMoves);
         }
 
@@ -63,28 +72,64 @@ public class RequestController {
             // just forage for now
             // maybe hunting here
             // maybe setting traps here
-            List<Move> foodMoves = movesTowardsFood(request, possibleMoves, mySnake);
-            outputMoveList(foodMoves, "foodMoves");
+            Map<String, List<Move>> snakeAwarenessMap = analyzeCollisions(mySnake, possibleMoves, otherSnakes);
+            List<Move> badMoves = snakeAwarenessMap.get(BAD_MOVE_KEY);
+            List<Move> goodMoves = snakeAwarenessMap.get(GOOD_MOVE_KEY);
 
-            Move myMove = foodMoves.stream().filter(thisFoodMove -> possibleMoves.contains(thisFoodMove)).findFirst().orElse(possibleMoves.get(0));
-            System.out.println("picking " + myMove.getName());
-            return new MoveResponse().setMove(myMove).setTaunt("foraging " + myMove.getName());
+            // if you can attack a smaller snake, go for it
+            if (!goodMoves.isEmpty()) {
+                // just pick the first one
+                moveResponse.setTaunt("Hunting " + goodMoves.get(0).getName());
+                moveResponse.setMove(goodMoves.get(0));
+                return moveResponse;
+            }
+            
+            // go towards food but don't make a bad move
+            List<Move> foodMoves = movesTowardsFood(request, possibleMoves, mySnake);
+            for (Move foodMove : foodMoves) {
+                if (possibleMoves.contains(foodMove)) {
+                    if (badMoves.contains(foodMove)) {
+                        moveResponse.setTaunt("Avoiding Collision " + foodMove.getName());
+                    } else {
+                        if (moveResponse.getTaunt() == null) {
+                            moveResponse.setTaunt("foraging " + foodMove.getName());
+                        }
+                        moveResponse.setMove(foodMove);
+                        return moveResponse;
+                    }
+                }
+            }
+
+            // we can't go towards food, so just make a move and don't make a bad move
+            for (Move possibleMove : possibleMoves) {
+                if (!badMoves.contains(possibleMove)) {
+                    if (moveResponse.getTaunt() == null) {
+                        moveResponse.setTaunt("just moving " + possibleMove.getName());
+                    }
+                    moveResponse.setMove(possibleMove);
+                    return moveResponse;
+                }
+            }
+            
+            // all possible moves are bad, so just go
+            if (moveResponse.getTaunt() == null) {
+                moveResponse.setTaunt("have to make a bad move " + possibleMoves.get(0).getName());
+            }
+            moveResponse.setMove(possibleMoves.get(0));
+            return moveResponse;
         } else {
-            return new MoveResponse()
-                    .setMove(Move.DOWN)
-                    .setTaunt("Oh Drat!");
+            moveResponse.setMove(Move.DOWN).setTaunt("Oh Drat!");
+            return moveResponse;
         }
     }
 
-    private List<Move> findDangerousMoves(MoveRequest request, Snake mySnake, List<Move> possibleMoves) {
+    private List<Move> findDangerousMoves(MoveRequest request, Snake mySnake, List<Snake> otherSnakes, List<Move> possibleMoves) {
         List<Move> dangerousMoves = new ArrayList<>();
-
+      
         for (Move possibleMove : possibleMoves) {
             if (itsATrap(request, mySnake.getCoords()[0], possibleMove)) {
                 dangerousMoves.add(possibleMove);
             }
-
-            // if (badCollisionPossible(request, possibleMove))
         }
 
         return dangerousMoves;
@@ -123,12 +168,11 @@ public class RequestController {
             return counter;
         }
         
-        // if we have already checked this point, return counter without incrementing
+        // if we have already checked this point, return counter - 1 because this point is not valid
         for (int[] thisCoveredPoint : coveredPoints) {
             if (coordinatesEquals(newHead, thisCoveredPoint)) {
                 System.out.println("Already checked this point [" + newHead[0] + "," + newHead[1] + "]");
                 return counter - 1;
-                // return counter;
             }
         }
         
@@ -168,12 +212,50 @@ public class RequestController {
         return proposedPoint;
     }
 
-    /*
-    private boolean badCollisionPossible(MoveRequest request, Move possibleMove) {
+
+    // look around at other snakes and determine good and bad moves
+    private Map<String, List<Move>> analyzeCollisions(Snake mySnake, List<Move> possibleMoves, List<Snake> otherSnakes) {
+        Map<String, List<Move>> moveMap = new HashMap<>();
+        List<Move> badMoveList = new ArrayList<>();
+        List<Move> goodMoveList = new ArrayList<>();
         
-        return false;
+        // find other snake heads
+
+        Map<int[], Integer> otherSnakeHeads = new HashMap<>();
+        for(Snake otherSnake : otherSnakes) {
+            otherSnakeHeads.put(otherSnake.getCoords()[0], otherSnake.getCoords().length);
+        }
+        
+        // for each possible move, check if there is a snake head in a dangerous spot
+        int[] myHead = mySnake.getCoords()[0];
+        int myLength = mySnake.getCoords().length;
+        Set<int[]> otherSnakeHeadPoints = otherSnakeHeads.keySet();
+        for(Move possibleMove : possibleMoves) {
+            int[] proposedPoint = findProposedPoint(myHead, possibleMove);
+            // check around the proposed point to see if there are any snake heads
+            for(int[] otherSnakeHeadPoint : otherSnakeHeadPoints) {
+                if(coordinatesEquals(otherSnakeHeadPoint, findProposedPoint(proposedPoint, Move.UP))
+                        || coordinatesEquals(otherSnakeHeadPoint, findProposedPoint(proposedPoint, Move.DOWN))
+                        || coordinatesEquals(otherSnakeHeadPoint, findProposedPoint(proposedPoint, Move.LEFT))
+                        || coordinatesEquals(otherSnakeHeadPoint, findProposedPoint(proposedPoint, Move.RIGHT))) {
+                    int otherSnakeLength = otherSnakeHeads.get(otherSnakeHeadPoint);
+                    if (otherSnakeLength < myLength) {
+                        goodMoveList.add(possibleMove);
+                    } else {
+                        badMoveList.add(possibleMove);
+                    }
+                }
+            }
+        }
+        
+        // if there's something that's both a good and bad move, it's a bad move
+        goodMoveList.removeAll(badMoveList);
+        
+        moveMap.put(BAD_MOVE_KEY, badMoveList);
+        moveMap.put(GOOD_MOVE_KEY, goodMoveList);
+        
+        return moveMap;
     }
-    */
 
     private void outputMoveList(List<Move> moveList, String name) {
         String message = "Here are the moves for " + name;
@@ -192,6 +274,14 @@ public class RequestController {
         List<Snake> snakes = request.getSnakes();
 
         return snakes.stream().filter(thisSnake -> thisSnake.getId().equals(myUuid)).findFirst().orElse(null);
+    }
+    
+    private List<Snake> findOtherSnakes(MoveRequest request) {
+        String myUuid = request.getYou();
+
+        List<Snake> snakes = request.getSnakes();
+
+        return snakes.stream().filter(thisSnake -> !thisSnake.getId().equals(myUuid)).collect(toList());
     }
 
     private List<Move> movesTowardsFood(MoveRequest request, List<Move> possibleMoves, Snake mySnake) {
