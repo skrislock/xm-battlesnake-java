@@ -1,14 +1,10 @@
 package com.battlesnake;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
-// import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import com.battlesnake.data.Move;
 import com.battlesnake.data.MoveRequest;

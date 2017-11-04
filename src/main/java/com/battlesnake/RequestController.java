@@ -67,8 +67,6 @@ public class RequestController {
         }
 
         if (!possibleMoves.isEmpty()) {
-            // just forage for now
-            // maybe hunting here
             // maybe setting traps here
             Map<String, List<Move>> snakeAwarenessMap = analyzeCollisions(mySnake, possibleMoves, otherSnakes);
             List<Move> badMoves = snakeAwarenessMap.get(BAD_MOVE_KEY);
@@ -83,7 +81,7 @@ public class RequestController {
             }
             
             // go towards food but don't make a bad move
-            List<Move> foodMoves = movesTowardsFood(request, possibleMoves, mySnake);
+            List<Move> foodMoves = movesTowardsFood(request, mySnake.getCoords()[0]);
             for (Move foodMove : foodMoves) {
                 if (possibleMoves.contains(foodMove)) {
                     if (badMoves.contains(foodMove)) {
@@ -99,6 +97,21 @@ public class RequestController {
             }
 
             // we can't go towards food, so just make a move and don't make a bad move
+            // can possibeMoves lead to food?
+            for (Move possibleMove : possibleMoves) {
+                int[] nextPossibleMove = findProposedPoint(mySnake.getCoords()[0], possibleMove);
+                List<Move> nextValidMoves = findValidMoves(request, nextPossibleMove, mySnake.getCoords()[0]);
+                List<Move> nextFoodMoves = movesTowardsFood(request, nextPossibleMove);
+                for (Move nextValidMove : nextValidMoves) {
+                    if (nextFoodMoves.contains(nextValidMove)) {
+                        moveResponse.setTaunt("turning around " + possibleMove.getName());
+                        moveResponse.setMove(possibleMove);
+                        return moveResponse;
+                    }
+                }
+            }
+
+            // can't seem to move towards food, so don't make a bad move
             for (Move possibleMove : possibleMoves) {
                 if (!badMoves.contains(possibleMove)) {
                     if (moveResponse.getTaunt() == null) {
@@ -254,7 +267,7 @@ public class RequestController {
         
         return moveMap;
     }
-
+/*
     private void outputMoveList(List<Move> moveList, String name) {
         String message = "Here are the moves for " + name;
 
@@ -265,6 +278,7 @@ public class RequestController {
         System.out.println(message);
 
     }
+    */
 
     private Snake findOurSnake(MoveRequest request) {
         String myUuid = request.getYou();
@@ -282,29 +296,29 @@ public class RequestController {
         return snakes.stream().filter(thisSnake -> !thisSnake.getId().equals(myUuid)).collect(toList());
     }
 
-    private List<Move> movesTowardsFood(MoveRequest request, List<Move> possibleMoves, Snake mySnake) {
+    private List<Move> movesTowardsFood(MoveRequest request, int[] mySnakeHead) {
         ArrayList<Move> returnMe = new ArrayList<>();
 
-        int[] head = mySnake.getCoords()[0];
+        // int[] head = mySnake.getCoords()[0];
 
         // faked for just 1 food pellet for now
         int closestFood = 0;
 
         int[] closestFoodLocation = request.getFood()[closestFood];
 
-        if (closestFoodLocation[0] < head[0]) {
+        if (closestFoodLocation[0] < mySnakeHead[0]) {
             returnMe.add(Move.LEFT);
         }
 
-        if (closestFoodLocation[0] > head[0]) {
+        if (closestFoodLocation[0] > mySnakeHead[0]) {
             returnMe.add(Move.RIGHT);
         }
 
-        if (closestFoodLocation[1] < head[1]) {
+        if (closestFoodLocation[1] < mySnakeHead[1]) {
             returnMe.add(Move.UP);
         }
 
-        if (closestFoodLocation[1] > head[1]) {
+        if (closestFoodLocation[1] > mySnakeHead[1]) {
             returnMe.add(Move.DOWN);
         }
         return returnMe;
