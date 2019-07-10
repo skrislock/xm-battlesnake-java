@@ -36,11 +36,11 @@ public class RequestController {
     public StartResponse start(@RequestBody StartRequest request) {
         return new StartResponse()
                 .setName("X Snake")
-                .setColor("#FF00F0")
+                .setColor("#F000F0")
                 .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
                 .setHeadType(HeadType.DEAD)
                 .setTailType(TailType.PIXEL)
-                .setTaunt("Roarrrrrrrrr!");
+                .setTaunt("INTERNET!");
     }
   
     @RequestMapping(value = "/move", method = RequestMethod.POST, produces = "application/json")
@@ -68,6 +68,8 @@ public class RequestController {
 
         if (!possibleMoves.isEmpty()) {
             // maybe setting traps here
+            
+            // TODO: add hunting to snake awareness or somewhere else?
             Map<String, List<Move>> snakeAwarenessMap = analyzeCollisions(mySnake, possibleMoves, otherSnakes);
             List<Move> badMoves = snakeAwarenessMap.get(BAD_MOVE_KEY);
             List<Move> goodMoves = snakeAwarenessMap.get(GOOD_MOVE_KEY);
@@ -80,6 +82,7 @@ public class RequestController {
                 return moveResponse;
             }
             
+            // TODO: analyze when we're going to lose a race then go to the centre of the board, or set traps or...? 
             // go towards food but don't make a bad move
             List<Move> foodMoves = movesTowardsFood(request, mySnake.getCoords()[0]);
             for (Move foodMove : foodMoves) {
@@ -96,6 +99,7 @@ public class RequestController {
                 }
             }
 
+            // TODO: I think this needs more testing
             // we can't go towards food, so just make a move and don't make a bad move
             // can possibeMoves lead to food?
             for (Move possibleMove : possibleMoves) {
@@ -111,6 +115,7 @@ public class RequestController {
                 }
             }
 
+            // TODO: Maybe try to move towards the centre? 
             // can't seem to move towards food, so don't make a bad move
             for (Move possibleMove : possibleMoves) {
                 if (!badMoves.contains(possibleMove)) {
