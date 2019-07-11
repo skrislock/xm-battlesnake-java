@@ -1,6 +1,7 @@
 package com.battlesnake;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,10 +18,13 @@ import com.battlesnake.data.Snake;
 public class RequestControllerTest {
     RequestController rc = new RequestController();
     MoveRequest moveRequest = new MoveRequest();
-
+    
+    final String mySnakeUuid = "2c4d4d70-8cca-48e0-ac9d-03ecafca0c98";
+    final String enemySnakeUuid = "7e87374a-2ca8-41fc-b56a-86a6f2e74aef";
+    
     // test trap avoidance
     private void setUpTrapSnake() {
-        String mySnakeUuid = "2c4d4d70-8cca-48e0-ac9d-03ecafca0c98";
+        
 
         Snake mySnake = makeTrapSnake(mySnakeUuid);
 
@@ -49,9 +53,6 @@ public class RequestControllerTest {
 
     // test collision avoidance
     private void setUpDangerousEnemySnake() {
-        String mySnakeUuid = "2c4d4d70-8cca-48e0-ac9d-03ecafca0c98";
-        String enemySnakeUuid = "7e87374a-2ca8-41fc-b56a-86a6f2e74aef";
-        
         Snake mySnake = makeSmallSnake(mySnakeUuid);
         Snake enemySnake = makeBigSnake(enemySnakeUuid);
 
@@ -70,9 +71,6 @@ public class RequestControllerTest {
     
     // test aggressive
     private void setUpWeakEnemySnake() {
-        String mySnakeUuid = "2c4d4d70-8cca-48e0-ac9d-03ecafca0c98";
-        String enemySnakeUuid = "7e87374a-2ca8-41fc-b56a-86a6f2e74aef";
-        
         Snake mySnake = makeBigSnake(mySnakeUuid);
         Snake enemySnake = makeSmallSnake(enemySnakeUuid);
 
@@ -161,5 +159,49 @@ public class RequestControllerTest {
         Assert.assertEquals(Move.LEFT, orderedMoves.get(1));
         Assert.assertEquals(Move.UP, orderedMoves.get(2));
         Assert.assertEquals(Move.DOWN, orderedMoves.get(3));
+    }
+    
+    @Test
+    public void testDistanceToFood() {
+        setUpWeakEnemySnake();
+        
+        Snake mySnake = rc.findOurSnake(moveRequest);
+        Snake otherSnake = rc.findOtherSnakes(moveRequest).get(0);
+        
+        Assert.assertEquals(new Integer(5), rc.calculateDistanceToFood(moveRequest, mySnake));
+        Assert.assertEquals(new Integer(7), rc.calculateDistanceToFood(moveRequest, otherSnake));
+        
+        moveRequest.setFood(new int[][] { { 1, 0 } });
+        
+        Assert.assertEquals(new Integer(2), rc.calculateDistanceToFood(moveRequest, mySnake));
+        Assert.assertEquals(new Integer(0), rc.calculateDistanceToFood(moveRequest, otherSnake));
+    }
+    
+    @Test
+    public void testCompareDistanceToFoodCloser() {
+        setUpWeakEnemySnake();
+        
+        moveRequest.setFood(new int[][] { { 0, 0 } });
+        
+        Snake mySnake = rc.findOurSnake(moveRequest);
+        Snake otherSnake = rc.findOtherSnakes(moveRequest).get(0);
+        
+        List<Snake> closerSnakes = rc.compareDistanceToFood(moveRequest, Collections.singletonList(otherSnake),
+                rc.calculateDistanceToFood(moveRequest, mySnake), true);
+        
+        Assert.assertTrue(closerSnakes.contains(otherSnake));
+    }
+    
+    @Test
+    public void testCompareDistanceToFoodFurther() {
+        setUpWeakEnemySnake();
+        
+        Snake mySnake = rc.findOurSnake(moveRequest);
+        Snake otherSnake = rc.findOtherSnakes(moveRequest).get(0);
+        
+        List<Snake> closerSnakes = rc.compareDistanceToFood(moveRequest, Collections.singletonList(otherSnake),
+                rc.calculateDistanceToFood(moveRequest, mySnake), false);
+        
+        Assert.assertTrue(closerSnakes.contains(otherSnake));
     }
 }

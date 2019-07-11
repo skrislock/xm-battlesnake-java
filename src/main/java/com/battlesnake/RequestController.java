@@ -37,11 +37,12 @@ public class RequestController {
     public StartResponse start(@RequestBody StartRequest request) {
         return new StartResponse()
                 .setName("X Snake")
-                .setColor("#4444F0")
-                .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
+                .setColor("#FF69B4")
+                // .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
+                .setHeadUrl("https://blog-001.west.edge.storage-yahoo.jp/res/blog-f0-36/tyumo19601961/folder/1563605/23/64689623/img_0_m?1545484950")
                 .setHeadType(HeadType.DEAD)
                 .setTailType(TailType.PIXEL)
-                .setTaunt("Am I Smarter?!");
+                .setTaunt("ボーっと生きてんじゃねーよ");
     }
   
     @RequestMapping(value = "/move", method = RequestMethod.POST, produces = "application/json")
@@ -58,6 +59,9 @@ public class RequestController {
         
         List<Move> trapMoves = determineDangerousMoves(calculateTrapFactor(request, mySnake, otherSnakes), moveAndFieldMap);
         List<Move> orderedMoves = orderMoves(moveAndFieldMap);
+        
+        boolean resetting = false;
+        boolean foraging = false;
 
 
         if (!possibleMoves.isEmpty()) {
@@ -65,57 +69,125 @@ public class RequestController {
             
             // TODO: add hunting to snake awareness or somewhere else?
             Map<String, List<Move>> snakeAwarenessMap = analyzeCollisions(mySnake, possibleMoves, otherSnakes);
-            List<Move> badMoves = snakeAwarenessMap.get(BAD_MOVE_KEY);
-            List<Move> goodMoves = snakeAwarenessMap.get(GOOD_MOVE_KEY);
-
-            // if you can attack a smaller snake, go for it
-            for (Move goodMove : goodMoves) {
-                // do we hunt if that means going into a trap?  Let'a avoid now
-                if (trapMoves.contains(goodMove)) {
-                    continue;
-                }
-                
-                moveResponse.setTaunt("Hunting " + goodMove.getName());
-                moveResponse.setMove(goodMove);
-                return moveResponse;
-            }
-            
-            // TODO: analyze when we're going to lose a race then go to the centre of the board, or set traps or...? 
-            // STRATEGY PART 1: Go towards food if you can
-            // go towards food but don't make a bad move
+            List<Move> avoidMoves = snakeAwarenessMap.get(BAD_MOVE_KEY);
+            List<Move> attackMoves = snakeAwarenessMap.get(GOOD_MOVE_KEY);
             List<Move> foodMoves = new ArrayList<Move>();
             // go towards food in your preferred order of moves
             foodMoves.addAll(orderedMoves);
-            foodMoves.retainAll(movesTowardsFood(request, mySnake.getCoords()[0]));
-            for (Move foodMove : foodMoves) {
-                if (badMoves.contains(foodMove)) {
-                    moveResponse.setTaunt("Avoiding Collision " + foodMove.getName());
-                } else if (trapMoves.contains(foodMove)){
-                    moveResponse.setTaunt("Avoiding Trap " + foodMove.getName());
-                } else {
-                    if (moveResponse.getTaunt() == null) {
-                        moveResponse.setTaunt("foraging " + foodMove.getName());
-                    }
-                    moveResponse.setMove(foodMove);
+            foodMoves.retainAll(movesTowardsCoordinates(request.getFood()[0], mySnake.getCoords()[0]));
+
+            // prefer food AND attack to just attack
+            // this is sloppy but we'll look this twice to find that possible food move
+            for (Move attackMove : attackMoves) {
+                // do we hunt if that means going into a trap?  Let'a avoid now
+                if (trapMoves.contains(attackMove)) {
+                    continue;
+                }
+                
+                if (foodMoves.contains(attackMove)) {
+                    moveResponse.setTaunt("Attacking " + attackMove.getName());
+                    moveResponse.setMove(attackMove);
                     return moveResponse;
                 }
             }
+            
+            // no food around, so if you can attack a smaller snake, go for it
+            for (Move attackMove : attackMoves) {
+                // do we hunt if that means going into a trap?  Let'a avoid now
+                if (trapMoves.contains(attackMove)) {
+                    continue;
+                }
+                
+                moveResponse.setTaunt("Attacking " + attackMove.getName());
+                moveResponse.setMove(attackMove);
+                return moveResponse;
+            }
+            
+            int myDistanceToFood = calculateDistanceToFood(request, mySnake);
+            List<Snake> closerSnakes = compareDistanceToFood(request, otherSnakes, myDistanceToFood, true);
+            List<Snake> furtherSnakes = compareDistanceToFood(request, otherSnakes, myDistanceToFood, false);
+            
+            if (closerSnakes.size() == 0) {  // we can likely reach the food first
+                Move huntMove = findHuntMove(request, mySnake, furtherSnakes);
+                if (huntMove != null) {
+                    moveResponse.setTaunt("Hunting: " + huntMove.getName());
+                    moveResponse.setMove(huntMove);
+                    return moveResponse;
+                } else { // we are closer to food so try to get it
+                    foraging = true;
+                    // go towards food but don't make a bad move
+                    for (Move foodMove : foodMoves) {
+                        if (avoidMoves.contains(foodMove)) {
+                            moveResponse.setTaunt("Avoiding Collision " + foodMove.getName());
+                        } else if (trapMoves.contains(foodMove)){
+                            moveResponse.setTaunt("Avoiding Trap " + foodMove.getName());
+                        } else {
+                            if (moveResponse.getTaunt() == null) {
+                                moveResponse.setTaunt("foraging " + foodMove.getName());
+                            }
+                            moveResponse.setMove(foodMove);
+                            return moveResponse;
+                        }
+                    }
+                }
+            } else { // try to go to the centre of the board to get ready for next food
+                resetting = true;
+                List<Move> centreMoves = new ArrayList<Move>();
+                // go towards food in your preferred order of moves
+                centreMoves.addAll(orderedMoves);
+                centreMoves.retainAll(
+                        movesTowardsCoordinates(new int[] {Math.round(request.getWidth()/2), Math.round(request.getHeight()/2)}
+                        , mySnake.getCoords()[0]));
+                // go towards centre but don't make a bad move
+                for (Move centerMove : centreMoves) {
+                    if (avoidMoves.contains(centerMove)) {
+                        moveResponse.setTaunt("Avoiding Collision " + centerMove.getName());
+                    } else if (trapMoves.contains(centerMove)){
+                        moveResponse.setTaunt("Avoiding Trap " + centerMove.getName());
+                    } else {
+                        if (moveResponse.getTaunt() == null) {
+                            moveResponse.setTaunt("resetting " + centerMove.getName());
+                        }
+                        moveResponse.setMove(centerMove);
+                        return moveResponse;
+                    }
+                }                
+            }
 
-            // TODO: I think this needs more testing
             // we can't go towards food, so just make a move and don't make a bad move
-            // can possibeMoves lead to food?
+            // try to reset?
+            if (resetting) {
+                for (Move possibleMove : orderedMoves) {
+                    if (avoidMoves.contains(possibleMove) || trapMoves.contains(possibleMove)) {
+                        continue;
+                    }
+                    int[] nextPossibleMove = findProposedPoint(mySnake.getCoords()[0], possibleMove);
+                    List<Move> nextValidMoves = findValidMoves(request, nextPossibleMove, mySnake.getCoords()[0]);
+                    List<Move> nextResettingMoves = movesTowardsCoordinates(new int[]
+                            {Math.round(request.getWidth()/2), Math.round(request.getHeight()/2)}, nextPossibleMove);
+                    for (Move nextValidMove : nextValidMoves) {
+                        if (nextResettingMoves.contains(nextValidMove)) {
+                            moveResponse.setTaunt("turning around to reset " + possibleMove.getName());
+                            moveResponse.setMove(possibleMove);
+                            return moveResponse;                        
+                        }
+                    }
+                }
+            }
+            
+            // coudn't reset, so try to move towards food
             for (Move possibleMove : orderedMoves) {
-                if (badMoves.contains(possibleMove) || trapMoves.contains(possibleMove)) {
+                if (avoidMoves.contains(possibleMove) || trapMoves.contains(possibleMove)) {
                     continue;
                 }
                 int[] nextPossibleMove = findProposedPoint(mySnake.getCoords()[0], possibleMove);
                 List<Move> nextValidMoves = findValidMoves(request, nextPossibleMove, mySnake.getCoords()[0]);
-                List<Move> nextFoodMoves = movesTowardsFood(request, nextPossibleMove);
+                List<Move> nextFoodMoves = movesTowardsCoordinates(request.getFood()[0], nextPossibleMove);
                 for (Move nextValidMove : nextValidMoves) {
                     if (nextFoodMoves.contains(nextValidMove)) {
-                        moveResponse.setTaunt("turning around " + possibleMove.getName());
+                        moveResponse.setTaunt("turning around to forage " + possibleMove.getName());
                         moveResponse.setMove(possibleMove);
-                        return moveResponse;
+                        return moveResponse;                        
                     }
                 }
             }
@@ -123,7 +195,7 @@ public class RequestController {
             // TODO: Maybe try to move towards the centre? 
             // can't seem to move towards food, so don't make a bad move
             for (Move possibleMove : orderedMoves) {
-                if (!badMoves.contains(possibleMove) && !trapMoves.contains(possibleMove)) {
+                if (!avoidMoves.contains(possibleMove) && !trapMoves.contains(possibleMove)) {
                     if (moveResponse.getTaunt() == null) {
                         moveResponse.setTaunt("just moving " + possibleMove.getName());
                     }
@@ -288,7 +360,7 @@ public class RequestController {
     }
     */
 
-    private Snake findOurSnake(MoveRequest request) {
+    Snake findOurSnake(MoveRequest request) {
         String myUuid = request.getYou();
 
         List<Snake> snakes = request.getSnakes();
@@ -296,7 +368,7 @@ public class RequestController {
         return snakes.stream().filter(thisSnake -> thisSnake.getId().equals(myUuid)).findFirst().orElse(null);
     }
     
-    private List<Snake> findOtherSnakes(MoveRequest request) {
+    List<Snake> findOtherSnakes(MoveRequest request) {
         String myUuid = request.getYou();
 
         List<Snake> snakes = request.getSnakes();
@@ -304,29 +376,21 @@ public class RequestController {
         return snakes.stream().filter(thisSnake -> !thisSnake.getId().equals(myUuid)).collect(toList());
     }
 
-    private List<Move> movesTowardsFood(MoveRequest request, int[] mySnakeHead) {
+    private List<Move> movesTowardsCoordinates(int[] targetCoordinates, int[] mySnakeHead) {
         ArrayList<Move> returnMe = new ArrayList<>();
-
-        // int[] head = mySnake.getCoords()[0];
-
-        // faked for just 1 food pellet for now
-        int closestFood = 0;
-
-        int[] closestFoodLocation = request.getFood()[closestFood];
-
-        if (closestFoodLocation[0] < mySnakeHead[0]) {
+        if (targetCoordinates[0] < mySnakeHead[0]) {
             returnMe.add(Move.LEFT);
         }
 
-        if (closestFoodLocation[0] > mySnakeHead[0]) {
+        if (targetCoordinates[0] > mySnakeHead[0]) {
             returnMe.add(Move.RIGHT);
         }
 
-        if (closestFoodLocation[1] < mySnakeHead[1]) {
+        if (targetCoordinates[1] < mySnakeHead[1]) {
             returnMe.add(Move.UP);
         }
 
-        if (closestFoodLocation[1] > mySnakeHead[1]) {
+        if (targetCoordinates[1] > mySnakeHead[1]) {
             returnMe.add(Move.DOWN);
         }
         return returnMe;
@@ -480,11 +544,46 @@ public class RequestController {
         return orderedMoves;
     }
     
+    // assume one food for now, and don't worry about snake bodies
+    // TODO: recurse through here (maybe double during trap detection) to determine actual path distance
+    Integer calculateDistanceToFood(MoveRequest request, Snake snake) {
+        // faked for just 1 food pellet for now
+        int [] closestFoodLocation = request.getFood()[0];
+        
+        int [] snakeHead = snake.getCoords()[0];
+        
+        int distanceToFood = Math.abs(closestFoodLocation[0] - snakeHead[0]) + Math.abs(closestFoodLocation[1] - snakeHead[1]);
+
+        return distanceToFood;
+    }
+    
+    List<Snake> compareDistanceToFood(MoveRequest request, List<Snake> otherSnakes, int myDistanceToFood, boolean findCloser) {
+        List<Snake> foundSnakes = new ArrayList<Snake>();
+        for (Snake otherSnake : otherSnakes) {
+            if (findCloser) {
+                if (calculateDistanceToFood(request, otherSnake) < myDistanceToFood) {
+                    foundSnakes.add(otherSnake);
+                }
+            } else {
+                if (calculateDistanceToFood(request, otherSnake) >= myDistanceToFood) {
+                    foundSnakes.add(otherSnake);
+                }
+            }
+        }
+        return foundSnakes;
+    }
+    
+    Move findHuntMove(MoveRequest request, Snake mySnake, List<Snake> furtherSnakes) {
+        return null;
+    }
+    
     @RequestMapping(value = "/end", method = RequestMethod.POST)
     public Object end() {
         // No response required
         Map<String, Object> responseObject = new HashMap<String, Object>();
         return responseObject;
     }
+    
+    
 
 }
