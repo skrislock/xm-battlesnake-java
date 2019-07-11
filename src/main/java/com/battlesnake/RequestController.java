@@ -37,7 +37,7 @@ public class RequestController {
     public StartResponse start(@RequestBody StartRequest request) {
         return new StartResponse()
                 .setName("X Snake")
-                .setColor("#FF69B4")
+                .setColor("#FF0000")
                 // .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
                 .setHeadUrl("https://blog-001.west.edge.storage-yahoo.jp/res/blog-f0-36/tyumo19601961/folder/1563605/23/64689623/img_0_m?1545484950")
                 .setHeadType(HeadType.DEAD)
@@ -52,6 +52,11 @@ public class RequestController {
         Snake mySnake = findOurSnake(request);
         List<Snake> otherSnakes = findOtherSnakes(request);
         
+        Map<int[], Integer> otherSnakeHeadsAndLength = new HashMap<>();
+        for(Snake otherSnake : otherSnakes) {
+            otherSnakeHeadsAndLength.put(otherSnake.getCoords()[0], otherSnake.getCoords().length);
+        }
+        
         List<Move> possibleMoves = findValidMoves(request, mySnake.getCoords()[0], mySnake.getCoords()[1]);
 
         // try to find traps, determine field size for each move recursively
@@ -61,14 +66,14 @@ public class RequestController {
         List<Move> orderedMoves = orderMoves(moveAndFieldMap);
         
         boolean resetting = false;
-        boolean foraging = false;
+        // boolean foraging = false;
 
 
         if (!possibleMoves.isEmpty()) {
             // maybe setting traps here
             
             // TODO: add hunting to snake awareness or somewhere else?
-            Map<String, List<Move>> snakeAwarenessMap = analyzeCollisions(mySnake, possibleMoves, otherSnakes);
+            Map<String, List<Move>> snakeAwarenessMap = analyzeCollisions(mySnake, possibleMoves, otherSnakeHeadsAndLength);
             List<Move> avoidMoves = snakeAwarenessMap.get(BAD_MOVE_KEY);
             List<Move> attackMoves = snakeAwarenessMap.get(GOOD_MOVE_KEY);
             List<Move> foodMoves = new ArrayList<Move>();
@@ -103,31 +108,47 @@ public class RequestController {
                 return moveResponse;
             }
             
-            int myDistanceToFood = calculateDistanceToFood(request, mySnake);
+            int myDistanceToFood = calculateDistanceToCoordinates(request.getFood()[0], mySnake);
             List<Snake> closerSnakes = compareDistanceToFood(request, otherSnakes, myDistanceToFood, true);
             List<Snake> furtherSnakes = compareDistanceToFood(request, otherSnakes, myDistanceToFood, false);
+            int starvationMarginOfError = 10;
             
-            if (closerSnakes.size() == 0) {  // we can likely reach the food first
-                Move huntMove = findHuntMove(request, mySnake, furtherSnakes);
-                if (huntMove != null) {
-                    moveResponse.setTaunt("Hunting: " + huntMove.getName());
-                    moveResponse.setMove(huntMove);
-                    return moveResponse;
-                } else { // we are closer to food so try to get it
-                    foraging = true;
-                    // go towards food but don't make a bad move
-                    for (Move foodMove : foodMoves) {
-                        if (avoidMoves.contains(foodMove)) {
-                            moveResponse.setTaunt("Avoiding Collision " + foodMove.getName());
-                        } else if (trapMoves.contains(foodMove)){
-                            moveResponse.setTaunt("Avoiding Trap " + foodMove.getName());
-                        } else {
-                            if (moveResponse.getTaunt() == null) {
-                                moveResponse.setTaunt("foraging " + foodMove.getName());
-                            }
-                            moveResponse.setMove(foodMove);
+            // TODO: Check my starvation logic for both cases
+            if (closerSnakes.size() == 0 || myDistanceToFood > mySnake.getHealth() + starvationMarginOfError) {  // we can likely reach the food first, or I'm in danger of starving
+                // TODO: Should I hunt any time I am longest 
+                // TODO: will only hunt I have enough health to get to the food, with a margin of error, and I'm closer to the targetSnake
+                if (iAmLongestSnake(mySnake, otherSnakeHeadsAndLength) 
+                        && myDistanceToFood < mySnake.getHealth() + starvationMarginOfError
+                        // TODO: make this multi-snake functional
+                        && furtherSnakes != null
+                        && !furtherSnakes.isEmpty()
+                        && myDistanceToFood > calculateDistanceToCoordinates(furtherSnakes.get(0).getCoords()[0], mySnake)) {
+                    List<Move> huntMoves = new ArrayList<Move>();
+                    // go towards food in your preferred order of moves
+                    huntMoves.addAll(orderedMoves);
+                    huntMoves.retainAll(findHuntMoves(request, mySnake, furtherSnakes));
+                    for (Move huntMove : huntMoves) {
+                        if (!avoidMoves.contains(huntMove) && !trapMoves.contains(huntMove)) {
+                            moveResponse.setTaunt("Hunting: " + huntMove.getName());
+                            moveResponse.setMove(huntMove);
                             return moveResponse;
                         }
+                    }
+                }
+                
+                // hunting didn't work out, but we are closer to food so try to get it
+                // go towards food but don't make a bad move
+                for (Move foodMove : foodMoves) {
+                    if (avoidMoves.contains(foodMove)) {
+                        moveResponse.setTaunt("Avoiding Collision " + foodMove.getName());
+                    } else if (trapMoves.contains(foodMove)){
+                        moveResponse.setTaunt("Avoiding Trap " + foodMove.getName());
+                    } else {
+                        if (moveResponse.getTaunt() == null) {
+                            moveResponse.setTaunt("foraging " + foodMove.getName());
+                        }
+                        moveResponse.setMove(foodMove);
+                        return moveResponse;
                     }
                 }
             } else { // try to go to the centre of the board to get ready for next food
@@ -230,8 +251,8 @@ public class RequestController {
         // analyze this move to see if we get ourselves into a space with less than 10 moves
         int[] proposedPoint = findProposedPoint(head, possibleMove);
         
-        System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "] for move: " + possibleMove.getName() 
-            + " proposedPoint: [" + proposedPoint[0] + "," + proposedPoint[1] + "]");
+        // System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "] for move: " + possibleMove.getName() 
+        //    + " proposedPoint: [" + proposedPoint[0] + "," + proposedPoint[1] + "]");
 
         int boardSize = request.getWidth() * request.getHeight();
 
@@ -240,9 +261,9 @@ public class RequestController {
         initialCoveredPoints.add(head);
         
         int possiblePathCount = recursePathFindTraps(request, proposedPoint, head, initialCoveredPoints, boardSize, 0);
-        System.out.println("Counted: " + possiblePathCount);
+        // System.out.println("Counted: " + possiblePathCount);
         if (possiblePathCount < boardSize) {
-            System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "], found : " + possiblePathCount + " moves");
+            // System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "], found : " + possiblePathCount + " moves");
             return possiblePathCount;
         }
 
@@ -252,7 +273,7 @@ public class RequestController {
     // maybe this can be used for more than finding traps
     private int recursePathFindTraps(MoveRequest request, int[] newHead, int [] newNeck,
             List<int[]> coveredPoints, int limit, int counter) {
-        System.out.println("counter is: " + counter + ", newHead is [" + newHead[0] + "," + newHead[1] + "]");
+        // System.out.println("counter is: " + counter + ", newHead is [" + newHead[0] + "," + newHead[1] + "]");
 
         // if we are over the limit, return counter without incrementing
         if (counter >= limit) {
@@ -262,7 +283,7 @@ public class RequestController {
         // if we have already checked this point, return counter - 1 because this point is not valid
         for (int[] thisCoveredPoint : coveredPoints) {
             if (coordinatesEquals(newHead, thisCoveredPoint)) {
-                System.out.println("Already checked this point [" + newHead[0] + "," + newHead[1] + "]");
+                // System.out.println("Already checked this point [" + newHead[0] + "," + newHead[1] + "]");
                 return counter - 1;
             }
         }
@@ -270,7 +291,7 @@ public class RequestController {
         ArrayList<Move> validMoves = findValidMoves(request, newHead, newNeck);
         
         if(validMoves.isEmpty()) { // no valid moves here
-            System.out.println("No valid moves");
+            // System.out.println("No valid moves");
             return counter;
         }
 
@@ -305,17 +326,12 @@ public class RequestController {
 
 
     // look around at other snakes and determine good and bad moves
-    private Map<String, List<Move>> analyzeCollisions(Snake mySnake, List<Move> possibleMoves, List<Snake> otherSnakes) {
+    private Map<String, List<Move>> analyzeCollisions(Snake mySnake, List<Move> possibleMoves, Map<int[], Integer> otherSnakeHeadsAndLength) {
         Map<String, List<Move>> moveMap = new HashMap<>();
         List<Move> badMoveList = new ArrayList<>();
         List<Move> goodMoveList = new ArrayList<>();
         
         // find other snake heads, and their length
-
-        Map<int[], Integer> otherSnakeHeadsAndLength = new HashMap<>();
-        for(Snake otherSnake : otherSnakes) {
-            otherSnakeHeadsAndLength.put(otherSnake.getCoords()[0], otherSnake.getCoords().length);
-        }
         
         // for each possible move, check if there is a snake head in a dangerous spot
         int[] myHead = mySnake.getCoords()[0];
@@ -347,18 +363,6 @@ public class RequestController {
         
         return moveMap;
     }
-/*
-    private void outputMoveList(List<Move> moveList, String name) {
-        String message = "Here are the moves for " + name;
-
-        for (Move move : moveList) {
-            message += " " + move.getName();
-        }
-
-        System.out.println(message);
-
-    }
-    */
 
     Snake findOurSnake(MoveRequest request) {
         String myUuid = request.getYou();
@@ -437,18 +441,18 @@ public class RequestController {
 
     public boolean analyze(MoveRequest request, int[] head, int[] previous, int[] analyzeMe) {
         if (coordinatesEquals(previous, analyzeMe)) {
-            System.out.println("don't go backwards");
+            // System.out.println("don't go backwards");
             return false;
         }
 
         // don't hit the walls
         if (analyzeMe[0] < 0 || analyzeMe[0] >= request.getWidth()) {
-            System.out.println("don't hit the wall");
+            // System.out.println("don't hit the wall");
             return false;
         }
 
         if (analyzeMe[1] < 0 || analyzeMe[1] >= request.getHeight()) {
-            System.out.println("don't hit the wall");
+            // System.out.println("don't hit the wall");
             return false;
         }
 
@@ -469,7 +473,7 @@ public class RequestController {
                 int[] thisCoord = thisSnakeCoords[i];
                 // System.out.println("found this coord:" + thisCoord[0] + ", " + thisCoord[1]);
                 if (coordinatesEquals(thisCoord, analyzeMe)) {
-                    System.out.println("don't hit another snake");
+                    // System.out.println("don't hit another snake");
                     return false;
                 }
             }
@@ -546,13 +550,10 @@ public class RequestController {
     
     // assume one food for now, and don't worry about snake bodies
     // TODO: recurse through here (maybe double during trap detection) to determine actual path distance
-    Integer calculateDistanceToFood(MoveRequest request, Snake snake) {
-        // faked for just 1 food pellet for now
-        int [] closestFoodLocation = request.getFood()[0];
-        
+    Integer calculateDistanceToCoordinates(int [] targetCoordinates, Snake snake) {
         int [] snakeHead = snake.getCoords()[0];
         
-        int distanceToFood = Math.abs(closestFoodLocation[0] - snakeHead[0]) + Math.abs(closestFoodLocation[1] - snakeHead[1]);
+        int distanceToFood = Math.abs(targetCoordinates[0] - snakeHead[0]) + Math.abs(targetCoordinates[1] - snakeHead[1]);
 
         return distanceToFood;
     }
@@ -561,11 +562,11 @@ public class RequestController {
         List<Snake> foundSnakes = new ArrayList<Snake>();
         for (Snake otherSnake : otherSnakes) {
             if (findCloser) {
-                if (calculateDistanceToFood(request, otherSnake) < myDistanceToFood) {
+                if (calculateDistanceToCoordinates(request.getFood()[0], otherSnake) < myDistanceToFood) {
                     foundSnakes.add(otherSnake);
                 }
             } else {
-                if (calculateDistanceToFood(request, otherSnake) >= myDistanceToFood) {
+                if (calculateDistanceToCoordinates(request.getFood()[0], otherSnake) >= myDistanceToFood) {
                     foundSnakes.add(otherSnake);
                 }
             }
@@ -573,8 +574,21 @@ public class RequestController {
         return foundSnakes;
     }
     
-    Move findHuntMove(MoveRequest request, Snake mySnake, List<Snake> furtherSnakes) {
-        return null;
+    List<Move> findHuntMoves(MoveRequest request, Snake mySnake, List<Snake> furtherSnakes) {
+        // this will work for one snake now...
+        return movesTowardsCoordinates(furtherSnakes.get(0).getCoords()[0], mySnake.getCoords()[0]);
+        // TODO: improve hunting algorithm
+       
+    }
+    
+    boolean iAmLongestSnake(Snake mySnake, Map<int[], Integer>  otherSnakeHeadsAndLength) {
+        Integer mySnakeLength = mySnake.getCoords().length;
+        for (Integer otherSnakeLengths : otherSnakeHeadsAndLength.values()) {
+            if (otherSnakeLengths >= mySnakeLength) {
+                return false;
+            }
+        }
+        return true;
     }
     
     @RequestMapping(value = "/end", method = RequestMethod.POST)

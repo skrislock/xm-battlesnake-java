@@ -168,13 +168,13 @@ public class RequestControllerTest {
         Snake mySnake = rc.findOurSnake(moveRequest);
         Snake otherSnake = rc.findOtherSnakes(moveRequest).get(0);
         
-        Assert.assertEquals(new Integer(5), rc.calculateDistanceToFood(moveRequest, mySnake));
-        Assert.assertEquals(new Integer(7), rc.calculateDistanceToFood(moveRequest, otherSnake));
+        Assert.assertEquals(new Integer(5), rc.calculateDistanceToCoordinates(moveRequest.getFood()[0], mySnake));
+        Assert.assertEquals(new Integer(7), rc.calculateDistanceToCoordinates(moveRequest.getFood()[0], otherSnake));
         
         moveRequest.setFood(new int[][] { { 1, 0 } });
         
-        Assert.assertEquals(new Integer(2), rc.calculateDistanceToFood(moveRequest, mySnake));
-        Assert.assertEquals(new Integer(0), rc.calculateDistanceToFood(moveRequest, otherSnake));
+        Assert.assertEquals(new Integer(2), rc.calculateDistanceToCoordinates(moveRequest.getFood()[0], mySnake));
+        Assert.assertEquals(new Integer(0), rc.calculateDistanceToCoordinates(moveRequest.getFood()[0], otherSnake));
     }
     
     @Test
@@ -187,7 +187,7 @@ public class RequestControllerTest {
         Snake otherSnake = rc.findOtherSnakes(moveRequest).get(0);
         
         List<Snake> closerSnakes = rc.compareDistanceToFood(moveRequest, Collections.singletonList(otherSnake),
-                rc.calculateDistanceToFood(moveRequest, mySnake), true);
+                rc.calculateDistanceToCoordinates(moveRequest.getFood()[0], mySnake), true);
         
         Assert.assertTrue(closerSnakes.contains(otherSnake));
     }
@@ -200,7 +200,7 @@ public class RequestControllerTest {
         Snake otherSnake = rc.findOtherSnakes(moveRequest).get(0);
         
         List<Snake> closerSnakes = rc.compareDistanceToFood(moveRequest, Collections.singletonList(otherSnake),
-                rc.calculateDistanceToFood(moveRequest, mySnake), false);
+                rc.calculateDistanceToCoordinates(moveRequest.getFood()[0], mySnake), false);
         
         Assert.assertTrue(closerSnakes.contains(otherSnake));
     }
