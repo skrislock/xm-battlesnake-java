@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.*;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 @RestController
 public class RequestController {
@@ -36,11 +37,11 @@ public class RequestController {
     public StartResponse start(@RequestBody StartRequest request) {
         return new StartResponse()
                 .setName("X Snake")
-                .setColor("#F000F0")
+                .setColor("#4444F0")
                 .setHeadUrl("http://vignette1.wikia.nocookie.net/nintendo/images/6/61/Bowser_Icon.png/revision/latest?cb=20120820000805&path-prefix=en")
                 .setHeadType(HeadType.DEAD)
                 .setTailType(TailType.PIXEL)
-                .setTaunt("INTERNET!");
+                .setTaunt("Am I Smarter?!");
     }
   
     @RequestMapping(value = "/move", method = RequestMethod.POST, produces = "application/json")
@@ -49,22 +50,15 @@ public class RequestController {
         
         Snake mySnake = findOurSnake(request);
         List<Snake> otherSnakes = findOtherSnakes(request);
-
+        
         List<Move> possibleMoves = findValidMoves(request, mySnake.getCoords()[0], mySnake.getCoords()[1]);
 
-        // remove dangerous moves
-        List<Move> dangerousMoves = findDangerousMoves(request, mySnake, otherSnakes, possibleMoves);
+        // try to find traps, determine field size for each move recursively
+        Map<Move, Integer> moveAndFieldMap = calculateMoveAndFieldMap(request, mySnake, otherSnakes, possibleMoves);
+        
+        List<Move> trapMoves = determineDangerousMoves(calculateTrapFactor(request, mySnake, otherSnakes), moveAndFieldMap);
+        List<Move> orderedMoves = orderMoves(moveAndFieldMap);
 
-        List<Move> originalPossibleMoves = new ArrayList<>(possibleMoves);
-        if (!dangerousMoves.isEmpty()) {
-            moveResponse.setTaunt("Avoiding Trap");
-        }
-        possibleMoves.removeAll(dangerousMoves);
-
-        if (possibleMoves.isEmpty()) { // last resort
-            moveResponse.setTaunt("Last Resort");
-            possibleMoves.addAll(originalPossibleMoves);
-        }
 
         if (!possibleMoves.isEmpty()) {
             // maybe setting traps here
@@ -75,34 +69,45 @@ public class RequestController {
             List<Move> goodMoves = snakeAwarenessMap.get(GOOD_MOVE_KEY);
 
             // if you can attack a smaller snake, go for it
-            if (!goodMoves.isEmpty()) {
-                // just pick the first one
-                moveResponse.setTaunt("Hunting " + goodMoves.get(0).getName());
-                moveResponse.setMove(goodMoves.get(0));
+            for (Move goodMove : goodMoves) {
+                // do we hunt if that means going into a trap?  Let'a avoid now
+                if (trapMoves.contains(goodMove)) {
+                    continue;
+                }
+                
+                moveResponse.setTaunt("Hunting " + goodMove.getName());
+                moveResponse.setMove(goodMove);
                 return moveResponse;
             }
             
             // TODO: analyze when we're going to lose a race then go to the centre of the board, or set traps or...? 
+            // STRATEGY PART 1: Go towards food if you can
             // go towards food but don't make a bad move
-            List<Move> foodMoves = movesTowardsFood(request, mySnake.getCoords()[0]);
+            List<Move> foodMoves = new ArrayList<Move>();
+            // go towards food in your preferred order of moves
+            foodMoves.addAll(orderedMoves);
+            foodMoves.retainAll(movesTowardsFood(request, mySnake.getCoords()[0]));
             for (Move foodMove : foodMoves) {
-                if (possibleMoves.contains(foodMove)) {
-                    if (badMoves.contains(foodMove)) {
-                        moveResponse.setTaunt("Avoiding Collision " + foodMove.getName());
-                    } else {
-                        if (moveResponse.getTaunt() == null) {
-                            moveResponse.setTaunt("foraging " + foodMove.getName());
-                        }
-                        moveResponse.setMove(foodMove);
-                        return moveResponse;
+                if (badMoves.contains(foodMove)) {
+                    moveResponse.setTaunt("Avoiding Collision " + foodMove.getName());
+                } else if (trapMoves.contains(foodMove)){
+                    moveResponse.setTaunt("Avoiding Trap " + foodMove.getName());
+                } else {
+                    if (moveResponse.getTaunt() == null) {
+                        moveResponse.setTaunt("foraging " + foodMove.getName());
                     }
+                    moveResponse.setMove(foodMove);
+                    return moveResponse;
                 }
             }
 
             // TODO: I think this needs more testing
             // we can't go towards food, so just make a move and don't make a bad move
             // can possibeMoves lead to food?
-            for (Move possibleMove : possibleMoves) {
+            for (Move possibleMove : orderedMoves) {
+                if (badMoves.contains(possibleMove) || trapMoves.contains(possibleMove)) {
+                    continue;
+                }
                 int[] nextPossibleMove = findProposedPoint(mySnake.getCoords()[0], possibleMove);
                 List<Move> nextValidMoves = findValidMoves(request, nextPossibleMove, mySnake.getCoords()[0]);
                 List<Move> nextFoodMoves = movesTowardsFood(request, nextPossibleMove);
@@ -117,8 +122,8 @@ public class RequestController {
 
             // TODO: Maybe try to move towards the centre? 
             // can't seem to move towards food, so don't make a bad move
-            for (Move possibleMove : possibleMoves) {
-                if (!badMoves.contains(possibleMove)) {
+            for (Move possibleMove : orderedMoves) {
+                if (!badMoves.contains(possibleMove) && !trapMoves.contains(possibleMove)) {
                     if (moveResponse.getTaunt() == null) {
                         moveResponse.setTaunt("just moving " + possibleMove.getName());
                     }
@@ -129,9 +134,9 @@ public class RequestController {
             
             // all possible moves are bad, so just go
             if (moveResponse.getTaunt() == null) {
-                moveResponse.setTaunt("have to make a bad move " + possibleMoves.get(0).getName());
+                moveResponse.setTaunt("have to make a bad move " + orderedMoves.get(0).getName());
             }
-            moveResponse.setMove(possibleMoves.get(0));
+            moveResponse.setMove(orderedMoves.get(0));
             return moveResponse;
         } else {
             moveResponse.setMove(Move.DOWN).setTaunt("Oh Drat!");
@@ -139,39 +144,37 @@ public class RequestController {
         }
     }
 
-    private List<Move> findDangerousMoves(MoveRequest request, Snake mySnake, List<Snake> otherSnakes, List<Move> possibleMoves) {
-        List<Move> dangerousMoves = new ArrayList<>();
+    private Map<Move, Integer> calculateMoveAndFieldMap(MoveRequest request, Snake mySnake, List<Snake> otherSnakes, List<Move> possibleMoves) {
+        Map<Move, Integer> moveAndFieldMap = new HashMap<>();
       
         for (Move possibleMove : possibleMoves) {
-            if (itsATrap(request, mySnake.getCoords()[0], possibleMove)) {
-                dangerousMoves.add(possibleMove);
-            }
+            moveAndFieldMap.put(possibleMove, countFieldSize(request, mySnake.getCoords()[0], possibleMove));
         }
 
-        return dangerousMoves;
+        return moveAndFieldMap;
     }
 
-    private boolean itsATrap(MoveRequest request, int[] head, Move possibleMove) {
+    private int countFieldSize(MoveRequest request, int[] head, Move possibleMove) {
         // analyze this move to see if we get ourselves into a space with less than 10 moves
         int[] proposedPoint = findProposedPoint(head, possibleMove);
         
         System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "] for move: " + possibleMove.getName() 
             + " proposedPoint: [" + proposedPoint[0] + "," + proposedPoint[1] + "]");
 
-        int trapValue = 10;
+        int boardSize = request.getWidth() * request.getHeight();
 
         // maybe run this on every valid move? one less step?
         ArrayList<int[]> initialCoveredPoints = new ArrayList<>();
         initialCoveredPoints.add(head);
         
-        int possiblePathCount = recursePathFindTraps(request, proposedPoint, head, initialCoveredPoints, trapValue, 0);
+        int possiblePathCount = recursePathFindTraps(request, proposedPoint, head, initialCoveredPoints, boardSize, 0);
         System.out.println("Counted: " + possiblePathCount);
-        if (possiblePathCount < trapValue) {
-            System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "], found trap : " + possibleMove.getName());
-            return true;
+        if (possiblePathCount < boardSize) {
+            System.out.println("Analyzing head : [" + head[0] + "," + head[1] + "], found : " + possiblePathCount + " moves");
+            return possiblePathCount;
         }
 
-        return false;
+        return boardSize;
     }
     
     // maybe this can be used for more than finding traps
@@ -235,17 +238,17 @@ public class RequestController {
         List<Move> badMoveList = new ArrayList<>();
         List<Move> goodMoveList = new ArrayList<>();
         
-        // find other snake heads
+        // find other snake heads, and their length
 
-        Map<int[], Integer> otherSnakeHeads = new HashMap<>();
+        Map<int[], Integer> otherSnakeHeadsAndLength = new HashMap<>();
         for(Snake otherSnake : otherSnakes) {
-            otherSnakeHeads.put(otherSnake.getCoords()[0], otherSnake.getCoords().length);
+            otherSnakeHeadsAndLength.put(otherSnake.getCoords()[0], otherSnake.getCoords().length);
         }
         
         // for each possible move, check if there is a snake head in a dangerous spot
         int[] myHead = mySnake.getCoords()[0];
         int myLength = mySnake.getCoords().length;
-        Set<int[]> otherSnakeHeadPoints = otherSnakeHeads.keySet();
+        Set<int[]> otherSnakeHeadPoints = otherSnakeHeadsAndLength.keySet();
         for(Move possibleMove : possibleMoves) {
             int[] proposedPoint = findProposedPoint(myHead, possibleMove);
             // check around the proposed point to see if there are any snake heads
@@ -254,7 +257,7 @@ public class RequestController {
                         || coordinatesEquals(otherSnakeHeadPoint, findProposedPoint(proposedPoint, Move.DOWN))
                         || coordinatesEquals(otherSnakeHeadPoint, findProposedPoint(proposedPoint, Move.LEFT))
                         || coordinatesEquals(otherSnakeHeadPoint, findProposedPoint(proposedPoint, Move.RIGHT))) {
-                    int otherSnakeLength = otherSnakeHeads.get(otherSnakeHeadPoint);
+                    int otherSnakeLength = otherSnakeHeadsAndLength.get(otherSnakeHeadPoint);
                     if (otherSnakeLength < myLength) {
                         goodMoveList.add(possibleMove);
                     } else {
@@ -327,17 +330,6 @@ public class RequestController {
             returnMe.add(Move.DOWN);
         }
         return returnMe;
-    }
-
-    /*
-     * private Move determineMove(int[] head, int[] move) { System.out.println("Determining move for: head [" + head[0] + "," + head[1] + "], move[" + move[0] + "," + move[1] + "]"); if (head[0] + 1 == move[0] && head[1] == move[1]) { return Move.RIGHT; } else if (head[0] == move[0] && head[1] - 1 == move[1]) { return Move.UP; } else if (head[0] - 1 == move[0] && head[1] == move[1]) { return Move.LEFT; } else if (head[0] == move[0] && head[1] + 1 == move[1]) { return Move.DOWN; } else { return null; } }
-     */
-
-    @RequestMapping(value = "/end", method = RequestMethod.POST)
-    public Object end() {
-        // No response required
-        Map<String, Object> responseObject = new HashMap<String, Object>();
-        return responseObject;
     }
 
     public ArrayList<Move> findValidMoves(MoveRequest request, int[] head, int[] previous) {
@@ -442,6 +434,57 @@ public class RequestController {
         }
 
         return true;
+    }
+
+    private Integer calculateTrapFactor(MoveRequest request, Snake mySnake, List<Snake> otherSnakes) {
+        float boardSizeFactor = 0.036f;
+        float lengthFactor = 0.2f;
+        
+        int boardSize = request.getWidth() * request.getHeight();
+        int snakeLengthCounter = mySnake.getCoords().length;
+        int snakeCounter = 1; // mySnake
+        for (Snake otherSnake : otherSnakes) {
+            snakeLengthCounter += otherSnake.getCoords().length;
+            snakeCounter++;
+        }
+        float averageLength = snakeLengthCounter / snakeCounter;
+        
+        return Math.round((boardSize * boardSizeFactor) + (averageLength * lengthFactor));
+    }
+    
+    private List<Move> determineDangerousMoves(Integer trapFactor, Map<Move, Integer> moveAndFieldMap) {
+        List<Move> dangerousMoves = new ArrayList<Move>();
+        Set<Move> moves = moveAndFieldMap.keySet();
+        for (Move thisMove : moves) {
+            if (moveAndFieldMap.get(thisMove) < trapFactor) {
+                dangerousMoves.add(thisMove);
+            }
+        }
+        return dangerousMoves;
+    }
+    
+    
+    List<Move> orderMoves(Map<Move, Integer> moveAndFieldMap) {
+        List<Move> orderedMoves = new ArrayList<Move>();
+        Map<Move, Integer> sorted = moveAndFieldMap
+                .entrySet()
+                .stream()
+                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .collect(
+                    toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e2,
+                        LinkedHashMap::new));
+        
+        sorted.entrySet().forEach(entry -> {
+            orderedMoves.add(entry.getKey());
+        });
+        return orderedMoves;
+    }
+    
+    @RequestMapping(value = "/end", method = RequestMethod.POST)
+    public Object end() {
+        // No response required
+        Map<String, Object> responseObject = new HashMap<String, Object>();
+        return responseObject;
     }
 
 }

@@ -1,6 +1,9 @@
 package com.battlesnake;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.Assert;
@@ -143,5 +146,20 @@ public class RequestControllerTest {
         setUpWeakEnemySnake();
         MoveResponse moveResponse = rc.move(moveRequest);
         Assert.assertEquals(Move.LEFT, moveResponse.getMove());
+    }
+    
+    @Test
+    public void testOrderedMoves() {
+        Map<Move, Integer> testMap = new HashMap<Move, Integer>();
+        testMap.put(Move.DOWN, 1);
+        testMap.put(Move.UP, 2);
+        testMap.put(Move.LEFT, 3);
+        testMap.put(Move.RIGHT, 4);
+        
+        List<Move> orderedMoves = rc.orderMoves(testMap);
+        Assert.assertEquals(Move.RIGHT, orderedMoves.get(0));
+        Assert.assertEquals(Move.LEFT, orderedMoves.get(1));
+        Assert.assertEquals(Move.UP, orderedMoves.get(2));
+        Assert.assertEquals(Move.DOWN, orderedMoves.get(3));
     }
 }
