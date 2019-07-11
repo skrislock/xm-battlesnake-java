@@ -114,11 +114,11 @@ public class RequestController {
             int starvationMarginOfError = 10;
             
             // TODO: Check my starvation logic for both cases
-            if (closerSnakes.size() == 0 || myDistanceToFood > mySnake.getHealth() + starvationMarginOfError) {  // we can likely reach the food first, or I'm in danger of starving
+            if (closerSnakes.size() == 0 || myDistanceToFood > (mySnake.getHealth() - starvationMarginOfError)) {  // we can likely reach the food first, or I'm in danger of starving
                 // TODO: Should I hunt any time I am longest 
                 // TODO: will only hunt I have enough health to get to the food, with a margin of error, and I'm closer to the targetSnake
                 if (iAmLongestSnake(mySnake, otherSnakeHeadsAndLength) 
-                        && myDistanceToFood < mySnake.getHealth() + starvationMarginOfError
+                        && myDistanceToFood < (mySnake.getHealth() - starvationMarginOfError)
                         // TODO: make this multi-snake functional
                         && furtherSnakes != null
                         && !furtherSnakes.isEmpty()
