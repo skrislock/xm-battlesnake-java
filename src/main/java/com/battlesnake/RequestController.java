@@ -32,7 +32,16 @@ import static java.util.stream.Collectors.toMap;
 public class RequestController {
     private final String BAD_MOVE_KEY = "bad";
     private final String GOOD_MOVE_KEY = "good";
-
+    
+    @RequestMapping(value = "/", method = RequestMethod.GET, produces = "application/json")
+    public IndexResponse index() {
+        return new IndexResponse()
+                .setColor("#FF69B4")
+                .setApiversion("1")
+                .setHeadType(HeadType.PIXEL)
+                .setTailType(TailType.PIXEL);
+    }
+    
     @RequestMapping(value = "/start", method = RequestMethod.POST, produces = "application/json")
     public StartResponse start(@RequestBody StartRequest request) {
         return new StartResponse()
